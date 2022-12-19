@@ -430,9 +430,15 @@ func (plugin *NetPlugin) Add(args *cniSkel.CmdArgs) error {
 		}
 	}
 
+<<<<<<< HEAD
 	cnsClient, err := cnscli.New(nwCfg.CNSUrl, defaultRequestTimeout)
 	if err != nil {
 		return fmt.Errorf("failed to create cns client with error: %w", err)
+=======
+	cnsClient, er := cnscli.New(nil, nwCfg.CNSUrl, defaultRequestTimeout)
+	if er != nil {
+		return fmt.Errorf("failed to create cns client with error: %w", er)
+>>>>>>> fe330a74 (Azure Ipam sending data over to Cilium correctly (need to rmeove debug))
 	}
 
 	if nwCfg.MultiTenancy {
@@ -760,7 +766,7 @@ func (plugin *NetPlugin) createEndpointInternal(opt *createEndpointInternalOpt) 
 
 	setEndpointOptions(opt.cnsNetworkConfig, &epInfo, vethName)
 
-	cnsclient, err := cnscli.New(opt.nwCfg.CNSUrl, defaultRequestTimeout)
+	cnsclient, err := cnscli.New(nil, opt.nwCfg.CNSUrl, defaultRequestTimeout)
 	if err != nil {
 		log.Printf("failed to initialized cns client with URL %s: %v", opt.nwCfg.CNSUrl, err.Error())
 		return epInfo, plugin.Errorf(err.Error())
@@ -933,7 +939,7 @@ func (plugin *NetPlugin) Delete(args *cniSkel.CmdArgs) error {
 	if plugin.ipamInvoker == nil {
 		switch nwCfg.IPAM.Type {
 		case network.AzureCNS:
-			cnsClient, cnsErr := cnscli.New("", defaultRequestTimeout)
+			cnsClient, cnsErr := cnscli.New(nil, "", defaultRequestTimeout)
 			if cnsErr != nil {
 				log.Printf("[cni-net] failed to create cns client:%v", cnsErr)
 				return errors.Wrap(cnsErr, "failed to create cns client")
@@ -1147,7 +1153,7 @@ func (plugin *NetPlugin) Update(args *cniSkel.CmdArgs) error {
 		return plugin.Errorf(err.Error())
 	}
 
-	cnsclient, err := cnscli.New(nwCfg.CNSUrl, defaultRequestTimeout)
+	cnsclient, err := cnscli.New(nil, nwCfg.CNSUrl, defaultRequestTimeout)
 	if err != nil {
 		log.Printf("failed to initialized cns client with URL %s: %v", nwCfg.CNSUrl, err.Error())
 		return plugin.Errorf(err.Error())
