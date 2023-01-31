@@ -55,14 +55,9 @@ type MockCNSClient struct {
 	require                 *require.Assertions
 	request                 requestIPAddressHandler
 	requestIPs              requestIPsHandler
-<<<<<<< HEAD
 	release                 releaseIPAddressHandler
 	getNetworkContainerConfiguration     getNetworkContainerConfigurationHandler
 	getAllNetworkContainersConfiguration getAllNetworkContainersConfigurationHandler
-=======
-	release                 releaseIPsHandler
-	getNetworkConfiguration getNetworkConfigurationHandler
->>>>>>> 9c985136 (Address comments on PR)
 }
 
 func (c *MockCNSClient) RequestIPAddress(_ context.Context, ipconfig cns.IPConfigRequest) (*cns.IPConfigResponse, error) {
