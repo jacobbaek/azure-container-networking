@@ -1,0 +1,54 @@
+parameters:
+  name: ""
+  displayName: ""
+  clusterName: ""
+  osSku: ""
+
+stages:
+  - stage: ${{ parameters.name }}
+    displayName: E2E - ${{ parameters.displayName }}
+    dependsOn:
+    - setup
+    - binaries
+    - publish
+    jobs:
+      - job: ${{ parameters.name }}
+        displayName: Singletenancy AKS Swift Suite - (${{ parameters.name }})
+        timeoutInMinutes: 120
+        pool:
+          name: $(BUILD_POOL_NAME_DEFAULT)
+          demands: 
+          - agent.os -equals Linux
+          - Role -equals $(CUSTOM_E2E_ROLE)
+        variables:
+          GOPATH: "$(Agent.TempDirectory)/go" # Go workspace path
+          GOBIN: "$(GOPATH)/bin" # Go binaries path
+          TAG: $[ stagedependencies.setup.env.outputs['EnvironmentalVariables.Tag'] ]
+        steps:
+          - task: DownloadPipelineArtifact@2 # Download CNI binary from 'binaries' stage
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'output'
+              itemPattern: '**/azure-vnet-cni-windows-amd64-$(TAG).zip'
+              downloadPath: '$(Agent.TempDirectory)'
+          - task: ExtractFiles@1
+            inputs:
+              archiveFilePatterns: '$(Agent.TempDirectory)/bins/azure-vnet-cni-windows-amd64-$(TAG).zip'
+              destinationFolder: '$(Agent.TempDirectory)'
+              cleanDestinationFolder: false
+              workingDirectory: '$(Agent.TempDirectory)'
+          - task: CopyFiles@2
+            inputs:
+              SourceFolder: '$(Agent.TempDirectory)'
+              Contents: 'azure-vnet.exe'
+              TargetFolder: '$(Build.SourcesDirectory)'
+          - template: ../../containers/container-template.yaml # Build wrapper CNI updater image to be deployed on e2e cluster's windows nodes
+            parameters:
+              arch: amd64
+              name: e2e-cni-updater
+              os: windows
+          - template: e2e-step-template.yaml # Configure cluster and run e2e tests
+            parameters:
+              name: ${{ parameters.name }}
+              clusterName: ${{ parameters.clusterName }}

@@ -249,6 +249,7 @@ CNI_DROPGZ_IMAGE 	  = cni-dropgz
 CNI_DROPGZ_TEST_IMAGE = cni-dropgz-test
 CNS_IMAGE        	  = azure-cns
 NPM_IMAGE        	  = azure-npm
+E2E_CNI_UPDATER_IMAGE = e2e-cni-updater
 
 ## Image platform tags.
 ACNCLI_PLATFORM_TAG    		 ?= $(subst /,-,$(PLATFORM))$(if $(OS_VERSION),-$(OS_VERSION),)-$(ACN_VERSION)
@@ -257,6 +258,7 @@ CNI_DROPGZ_TEST_PLATFORM_TAG ?= $(subst /,-,$(PLATFORM))$(if $(OS_VERSION),-$(OS
 CNS_PLATFORM_TAG        	 ?= $(subst /,-,$(PLATFORM))$(if $(OS_VERSION),-$(OS_VERSION),)-$(CNS_VERSION)
 CNS_WINDOWS_PLATFORM_TAG 	 ?= $(subst /,-,$(PLATFORM))$(if $(OS_VERSION),-$(OS_VERSION),)-$(CNS_VERSION)-$(WINDOWS_OS_SKU)
 NPM_PLATFORM_TAG        	 ?= $(subst /,-,$(PLATFORM))$(if $(OS_VERSION),-$(OS_VERSION),)-$(NPM_VERSION)
+E2E_CNI_UPDATER_TAG			 ?= $(subst /,-,$(PLATFORM))$(if $(OS_VERSION),-$(OS_VERSION),)-$(CNI_VERSION)
 
 
 qemu-user-static: ## Set up the host to run qemu multiplatform container builds.
@@ -303,6 +305,11 @@ container-pull: # util target to pull container image. do not invoke directly.
 
 
 ## Build specific container images.
+
+e2e-cni-updater-image:
+	$(MAKE) container \
+		DOCKERFILE=cni/windows.Dockerfile \
+		IMAGE=$(E2E_CNI_UPDATER_IMAGE)
 
 # acncli
 

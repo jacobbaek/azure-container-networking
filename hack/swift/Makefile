@@ -132,6 +132,33 @@ swift-byocni-up: rg-up swift-net-up ## Bring up a SWIFT BYO CNI cluster
 		--yes
 	@$(MAKE) set-kubeconf
 
+.PHONY: byocniwin-up
+byocniwin-up: rg-up swift-net-up ## Bring up a windows SWIFT BYO CNI cluster
+	$(AZCLI) aks create -n $(CLUSTER) -g $(GROUP) -l $(REGION) \
+		--node-count 2 \
+		--node-vm-size $(VM_SIZE) \
+		--network-plugin azure \
+		--generate-ssh-keys \
+		--vnet-subnet-id /subscriptions/$(SUB)/resourceGroups/$(GROUP)/providers/Microsoft.Network/virtualNetworks/$(VNET)/subnets/nodenet \
+		--pod-subnet-id /subscriptions/$(SUB)/resourceGroups/$(GROUP)/providers/Microsoft.Network/virtualNetworks/$(VNET)/subnets/podnet \
+		--os-sku $(OS_SKU) \
+		--yes
+
+	$(AZCLI) aks nodepool add --cluster-name $(CLUSTER) -g $(GROUP) \
+		--name $(NODEPOOL) \
+		--node-count 3 \
+		--vnet-subnet-id /subscriptions/$(SUB)/resourceGroups/$(GROUP)/providers/Microsoft.Network/virtualNetworks/$(VNET)/subnets/nodenet \
+		--pod-subnet-id /subscriptions/$(SUB)/resourceGroups/$(GROUP)/providers/Microsoft.Network/virtualNetworks/$(VNET)/subnets/podnet \
+		--os-type Windows \
+		--os-sku Windows2022
+
+	@$(MAKE) set-kubeconf
+
+.PHONY: restart-nodepool-vmss
+restart-nodepool-vmss: ## Restarts VMs in cluster's nodepool
+	NODEGROUP=$$($(AZCLI) aks show -g $(GROUP) -n $(CLUSTER) --query nodeResourceGroup -o tsv); \
+	$(AZCLI) vmss restart -g $$NODEGROUP -n $(VMSS) --instance-ids '*'
+
 swift-cilium-up: rg-up swift-net-up ## Bring up a SWIFT Cilium cluster
 	$(AZCLI) aks create -n $(CLUSTER) -g $(GROUP) -l $(REGION) \
 		--node-count 2 \

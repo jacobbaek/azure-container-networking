@@ -1,0 +1,75 @@
+parameters:
+  name: ""
+  clusterName: ""
+
+steps:
+  - bash: |
+      go version
+      go env
+      mkdir -p '$(GOBIN)'
+      mkdir -p '$(GOPATH)/pkg'
+      echo '##vso[task.prependpath]$(GOBIN)'
+      echo '##vso[task.prependpath]$(GOROOT)/bin'
+    displayName: "Set up the Go environment"
+
+  - script: |
+      set -e
+      go get github.com/onsi/ginkgo/ginkgo
+      go get github.com/onsi/gomega/...
+      go install github.com/onsi/ginkgo/ginkgo@latest
+      go install sigs.k8s.io/kubetest2@latest
+      go install sigs.k8s.io/kubetest2/kubetest2-noop@latest
+      go install sigs.k8s.io/kubetest2/kubetest2-tester-ginkgo@latest
+      wget https://storage.googleapis.com/pub/gsutil.tar.gz
+      tar xfz gsutil.tar.gz
+      sudo mv gsutil /usr/local/bin
+    displayName: "Configure Kubetest2 environment"
+
+  - task: AzureCLI@2
+    inputs:
+      azureSubscription: $(AZURE_TEST_AGENT_SERVICE_CONNECTION)
+      scriptLocation: "inlineScript"
+      scriptType: "bash"
+      addSpnToEnvironment: true
+      inlineScript: |
+        mkdir -p ~/.kube/        
+        make -C ./hack/swift azcfg AZCLI=az REGION=$(REGION_AKS_CLUSTER_TEST)
+        make -C ./hack/swift byocniwin-up AZCLI=az REGION=$(REGION_AKS_CLUSTER_TEST) SUB=$(SUB_AZURE_NETWORK_AGENT_TEST) CLUSTER=${{ parameters.clusterName }}-$(make revision) NODEPOOL=winpl
+    displayName: "Create cluster and retrieve credentials"
+
+  - script: |
+      set -e
+      kubectl get daemonset -n kube-system
+      kubectl delete daemonset azure-cns-win -n kube-system
+      kubectl get daemonset -n kube-system
+      envsubst < cns/azure-cns-windows.yaml | cat
+      envsubst < cns/azure-cns-windows.yaml | kubectl apply -f -
+      kubectl get daemonset -n kube-system
+    displayName: "Update CNS in windows pool"
+
+  - script: |
+      set -e
+      envsubst < cni/templates/upgrade-cni-daemonset.yaml | kubectl apply -f -
+      kubectl rollout status daemonset azure-cni-updater-windows -n kube-system --timeout 600s      
+      kubectl delete daemonset azure-cni-updater-windows -n kube-system
+    displayName: "Update CNI in windows pool"
+
+  - task: AzureCLI@2
+    inputs:
+      azureSubscription: $(AZURE_TEST_AGENT_SERVICE_CONNECTION)
+      scriptLocation: "inlineScript"
+      scriptType: "bash"
+      addSpnToEnvironment: true
+      inlineScript: |        
+        make -C ./hack/swift azcfg AZCLI=az REGION=$(REGION_AKS_CLUSTER_TEST)
+        make -C ./hack/swift restart-nodepool-vmss AZCLI=az CLUSTER=${{ parameters.clusterName }}-$(make revision) VMSS=akswinpl
+    displayName: "Restart windows nodepool"
+
+  - script: |      
+      export PATH=${PATH}:/usr/local/bin/gsutil
+      KUBECONFIG=~/.kube/config kubetest2 noop \
+        --test ginkgo -- \
+        --focus-regex "Services.*\[Conformance\].*"
+    displayName: "Run Services Conformance Tests"
+
+
