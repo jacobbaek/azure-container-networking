@@ -79,7 +79,7 @@ func (invoker *CNSIPAMInvoker) Add(addConfig IPAMAddConfig) (IPAMAddResult, erro
 	}
 
 	log.Printf("Requesting IP for pod %+v using ipconfig %+v", podInfo, ipconfig)
-	response, err := invoker.cnsClient.RequestIPAddress(context.TODO(), ipconfig)
+	response, err := invoker.cnsClient.RequestIPs(context.TODO(), ipconfig)
 	if err != nil {
 		log.Printf("Failed to get IP address from CNS with error %v, response: %v", err, response)
 		return IPAMAddResult{}, errors.Wrap(err, "Failed to get IP address from CNS with error: %w")
@@ -87,15 +87,15 @@ func (invoker *CNSIPAMInvoker) Add(addConfig IPAMAddConfig) (IPAMAddResult, erro
 
 	addResult := IPAMAddResult{}
 
-	for i := 0; i < len(response.PodIpInfo); i++ {
+	for i := 0; i < len(response.PodIPInfo); i++ {
 		info := IPResultInfo{
-			podIPAddress:       response.PodIpInfo[i].PodIPConfig.IPAddress,
-			ncSubnetPrefix:     response.PodIpInfo[i].NetworkContainerPrimaryIPConfig.IPSubnet.PrefixLength,
-			ncPrimaryIP:        response.PodIpInfo[i].NetworkContainerPrimaryIPConfig.IPSubnet.IPAddress,
-			ncGatewayIPAddress: response.PodIpInfo[i].NetworkContainerPrimaryIPConfig.GatewayIPAddress,
-			hostSubnet:         response.PodIpInfo[i].HostPrimaryIPInfo.Subnet,
-			hostPrimaryIP:      response.PodIpInfo[i].HostPrimaryIPInfo.PrimaryIP,
-			hostGateway:        response.PodIpInfo[i].HostPrimaryIPInfo.Gateway,
+			podIPAddress:       response.PodIPInfo[i].PodIPConfig.IPAddress,
+			ncSubnetPrefix:     response.PodIPInfo[i].NetworkContainerPrimaryIPConfig.IPSubnet.PrefixLength,
+			ncPrimaryIP:        response.PodIPInfo[i].NetworkContainerPrimaryIPConfig.IPSubnet.IPAddress,
+			ncGatewayIPAddress: response.PodIPInfo[i].NetworkContainerPrimaryIPConfig.GatewayIPAddress,
+			hostSubnet:         response.PodIPInfo[i].HostPrimaryIPInfo.Subnet,
+			hostPrimaryIP:      response.PodIPInfo[i].HostPrimaryIPInfo.PrimaryIP,
+			hostGateway:        response.PodIPInfo[i].HostPrimaryIPInfo.Gateway,
 		}
 
 		// set the NC Primary IP in options
