@@ -43,7 +43,10 @@ var clientPaths = []string{
 	cns.DeleteNetworkContainer,
 	cns.NetworkContainersURLPath,
 	cns.GetHomeAz,
+	"/network/requestIPRyan",
 }
+
+var ErrAPINotFound error = errors.New("api not found")
 
 type do interface {
 	Do(*http.Request) (*http.Response, error)
@@ -338,14 +341,16 @@ func (c *Client) RequestIPs(ctx context.Context, ipconfig cns.IPConfigRequest) (
 	}
 	req.Header.Set(headerContentType, contentTypeJSON)
 	res, err := c.client.Do(req)
-	if err != nil {
-		return nil, errors.Wrap(err, "http request failed")
-	}
 
 	defer res.Body.Close()
 
+	// if we get a 404 error
 	if res.StatusCode != http.StatusOK {
-		return nil, errors.Errorf("http response %d", res.StatusCode)
+		return nil, ErrAPINotFound
+	}
+
+	if err != nil {
+		return nil, errors.Wrap(err, "http request failed")
 	}
 
 	var response cns.IPConfigsResponse
