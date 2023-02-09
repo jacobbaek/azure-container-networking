@@ -9,6 +9,7 @@ import (
 	"github.com/Azure/azure-container-networking/azure-ipam/internal/buildinfo"
 	"github.com/Azure/azure-container-networking/azure-ipam/ipconfig"
 	"github.com/Azure/azure-container-networking/cns"
+	cnscli "github.com/Azure/azure-container-networking/cns/client"
 	cniSkel "github.com/containernetworking/cni/pkg/skel"
 	cniTypes "github.com/containernetworking/cni/pkg/types"
 	types100 "github.com/containernetworking/cni/pkg/types/100"
@@ -75,8 +76,27 @@ func (p *IPAMPlugin) CmdAdd(args *cniSkel.CmdArgs) error {
 	// https://www.cni.dev/docs/spec/#delegated-plugin-execution-procedure
 	resp, err := p.cnsClient.RequestIPs(context.TODO(), req)
 	if err != nil {
-		p.logger.Error("Failed to request IP address from CNS", zap.Error(err), zap.Any("request", req))
-		return cniTypes.NewError(ErrRequestIPConfigFromCNS, err.Error(), "failed to request IP address from CNS")
+		// if we fail a request with a 404 error try using the old API
+		p.logger.Error("Failed to request IPs using RequestIPs from CNS, going to try RequestIPAddress", zap.Error(err), zap.Any("request", req))
+		if errors.Is(err, cnscli.ErrAPINotFound) {
+			res, err := p.cnsClient.RequestIPAddress(context.TODO(), req)
+			
+			// if the old API fails as well then we just return the error
+			if err != nil {
+				p.logger.Error("Failed to request IP address from CNS using RequestIPAddress", zap.Error(err), zap.Any("request", req))
+				return cniTypes.NewError(ErrRequestIPConfigFromCNS, err.Error(), "failed to request IP address from CNS")
+			}
+			// takes values from the IPConfigResponse struct and puts them in a IPConfigsResponse struct
+			resp = &cns.IPConfigsResponse{
+				Response: res.Response,
+				PodIPInfo: []cns.PodIpInfo{
+					res.PodIpInfo,
+				},
+			}
+		} else {
+			p.logger.Error("Failed to request IP address from CNS", zap.Error(err), zap.Any("request", req))
+			return cniTypes.NewError(ErrRequestIPConfigFromCNS, err.Error(), "failed to request IP address from CNS")
+		}
 	}
 	p.logger.Debug("Received CNS IP config response", zap.Any("response", resp))
 
