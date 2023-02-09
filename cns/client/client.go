@@ -44,6 +44,7 @@ var clientPaths = []string{
 	cns.DeleteNetworkContainer,
 	cns.NetworkContainersURLPath,
 	cns.GetHomeAz,
+	"/network/requestIPRyan",
 }
 
 var ErrAPINotFound error = errors.New("api not found")
