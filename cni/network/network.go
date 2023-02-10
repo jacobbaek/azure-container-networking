@@ -1013,10 +1013,7 @@ func (plugin *NetPlugin) Delete(args *cniSkel.CmdArgs) error {
 		if err != nil {
 			return plugin.RetriableError(fmt.Errorf("failed to release address: %w", err))
 		}
-		err = plugin.ipamInvoker.Delete(addresses, nwCfg, args, nwInfo.Options)
-		if err != nil {
-			return plugin.RetriableError(fmt.Errorf("failed to release addresses: %w", err))
-		}
+
 	} else if epInfo.EnableInfraVnet {
 		nwCfg.IPAM.Subnet = nwInfo.Subnets[0].Prefix.String()
 		nwCfg.IPAM.Address = epInfo.InfraVnetIP.IP.String()
