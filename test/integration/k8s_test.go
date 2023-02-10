@@ -151,6 +151,8 @@ func TestPodScaling(t *testing.T) {
 				t.Fatalf("could not scale deployment: %v", err)
 			}
 
+			time.Sleep(100 * time.Second) // todo: estebanca Extra time for the scaling to complete to avoid false negatives
+
 			if !t.Run("all pods have IPs assigned", func(t *testing.T) {
 				podsClient := clientset.CoreV1().Pods(deployment.Namespace)
 
