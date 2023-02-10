@@ -53,10 +53,10 @@ func TestCNSIPAMInvoker_Add(t *testing.T) {
 				podNamespace: testPodInfo.PodNamespace,
 				cnsClient: &MockCNSClient{
 					require: require,
-					request: requestIPsHandler{
+					requestIPs: requestIPsHandler{
 						ipconfigArgument: getTestIPConfigRequest(),
 						result: &cns.IPConfigsResponse{
-							PodIpInfo: []cns.PodIpInfo{
+							PodIPInfo: []cns.PodIpInfo{
 								{
 									PodIPConfig: cns.IPSubnet{
 										IPAddress:    "10.0.1.10",
@@ -152,7 +152,7 @@ func TestCNSIPAMInvoker_Add(t *testing.T) {
 				podNamespace: testPodInfo.PodNamespace,
 				cnsClient: &MockCNSClient{
 					require: require,
-					request: requestIPsHandler{
+					requestIPs: requestIPsHandler{
 						ipconfigArgument: getTestIPConfigRequest(),
 						result:           nil,
 						err:              errors.New("failed error from CNS"), //nolint "error for ut"
