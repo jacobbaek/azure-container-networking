@@ -34,7 +34,7 @@ const (
 	gpServiceAccountPath     = gpFolder + "/service-account.yaml"
 	gpDaemonset              = gpFolder + "/daemonset.yaml"
 	gpDeployment             = gpFolder + "/deployment.yaml"
-	retryAttempts            = 60
+	retryAttempts            = 100
 	retryDelaySec            = 5 * time.Second
 )
 
