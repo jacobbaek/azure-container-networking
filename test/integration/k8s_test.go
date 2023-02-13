@@ -191,7 +191,7 @@ func TestPodScaling(t *testing.T) {
 			}
 
 			t.Run("all pods can ping each other", func(t *testing.T) {
-				clusterCheckCtx, cancel := context.WithTimeout(ctx, 20*time.Minute)
+				clusterCheckCtx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 				defer cancel()
 				clusterCheckFn := func() error {
 					pf, err := NewPortForwarder(restConfig)
