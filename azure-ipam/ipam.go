@@ -77,8 +77,8 @@ func (p *IPAMPlugin) CmdAdd(args *cniSkel.CmdArgs) error {
 	resp, err := p.cnsClient.RequestIPs(context.TODO(), req)
 	if err != nil {
 		// if we fail a request with a 404 error try using the old API
-		p.logger.Error("Failed to request IPs using RequestIPs from CNS, going to try RequestIPAddress", zap.Error(err), zap.Any("request", req))
 		if errors.Is(err, cnscli.ErrAPINotFound) {
+			p.logger.Error("Failed to request IPs using RequestIPs from CNS, going to try RequestIPAddress", zap.Error(err), zap.Any("request", req))
 			res, err := p.cnsClient.RequestIPAddress(context.TODO(), req)
 			
 			// if the old API fails as well then we just return the error
@@ -106,25 +106,24 @@ func (p *IPAMPlugin) CmdAdd(args *cniSkel.CmdArgs) error {
 		p.logger.Error("Failed to interpret CNS IPConfigResponse", zap.Error(err), zap.Any("response", resp))
 		return cniTypes.NewError(ErrProcessIPConfigResponse, err.Error(), "failed to interpret CNS IPConfigResponse")
 	}
-	for _, IPNet := range *podIPNet {
-		p.logger.Debug("Parsed pod IP", zap.String("podIPNet", IPNet.String()))
-	}
 
 	cniResult := &types100.Result{}
-	for _, IPNet := range *podIPNet {
+	cniResult.IPs = make([]*types100.IPConfig, len(*podIPNet))
+	for i, ipNet := range *podIPNet {
+		p.logger.Debug("Parsed pod IP", zap.String("podIPNet", ipNet.String()))
 		ipConfig := &types100.IPConfig{}
-		if net.ParseIP(IPNet.Addr().String()).To4() != nil {
+		if ipNet.Addr().Is4() { 
 			ipConfig.Address = net.IPNet{
-				IP:   net.ParseIP(IPNet.Addr().String()),
-				Mask: net.CIDRMask(IPNet.Bits(), 32), // nolint
+				IP:   net.ParseIP(ipNet.Addr().String()),
+				Mask: net.CIDRMask(ipNet.Bits(), 32), // nolint
 			}
 		} else {
 			ipConfig.Address = net.IPNet{
-				IP:   net.ParseIP(IPNet.Addr().String()),
-				Mask: net.CIDRMask(IPNet.Bits(), 128), // nolint
+				IP:   net.ParseIP(ipNet.Addr().String()),
+				Mask: net.CIDRMask(ipNet.Bits(), 128), // nolint
 			}
 		}
-		cniResult.IPs = append(cniResult.IPs, ipConfig)
+		cniResult.IPs[i] = ipConfig
 	}
 
 	// Get versioned result
