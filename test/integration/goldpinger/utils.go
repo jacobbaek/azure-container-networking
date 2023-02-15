@@ -14,6 +14,7 @@ func (c ClusterStats) AllPodsHealthy() bool {
 
 	for _, podStatus := range c.Responses {
 		if !podStatus.OK {
+			fmt.Printf("unhealthy pods: %+v", podStatus)
 			return false
 		}
 	}

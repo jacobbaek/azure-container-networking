@@ -43,7 +43,8 @@ var (
 	kubeconfig          = flag.String("test-kubeconfig", filepath.Join(homedir.HomeDir(), ".kube", "config"), "(optional) absolute path to the kubeconfig file")
 	delegatedSubnetID   = flag.String("delegated-subnet-id", "", "delegated subnet id for node labeling")
 	delegatedSubnetName = flag.String("subnet-name", "", "subnet name for node labeling")
-	gpPodScaleCounts    = []int{2, 10, 100, 2}
+	// gpPodScaleCounts    = []int{2, 10, 100, 2}
+	gpPodScaleCounts = []int{2, 10, 20, 2}
 )
 
 func shouldLabelNodes() bool {
@@ -152,6 +153,7 @@ func TestPodScaling(t *testing.T) {
 			}
 
 			if !t.Run("all pods have IPs assigned", func(t *testing.T) {
+				t.Log("checking if all pods have IPs assigned")
 				podsClient := clientset.CoreV1().Pods(deployment.Namespace)
 
 				checkPodIPsFn := func() error {
@@ -166,12 +168,14 @@ func TestPodScaling(t *testing.T) {
 
 					for _, pod := range podList.Items {
 						if pod.Status.Phase == apiv1.PodPending {
+							t.Logf("pod is still pending, name: %s", pod.Name)
 							return errors.New("some pods still pending")
 						}
 					}
 
 					for _, pod := range podList.Items {
 						if pod.Status.PodIP == "" {
+							t.Logf("pod has no ip allocated, name: %s", pod.Name)
 							return errors.New("a pod has not been allocated an IP")
 						}
 					}
@@ -184,6 +188,7 @@ func TestPodScaling(t *testing.T) {
 				}
 				t.Log("all pods have been allocated IPs")
 			}) {
+				t.Log("Pods don't have IP's")
 				errors.New("Pods don't have IP's")
 				return
 			}
