@@ -18,6 +18,17 @@ kubectl $kubeconfigArg get pod -A -o wide --show-labels > $filepath/allpods.out
 kubectl $kubeconfigArg get netpol -A -o yaml > $filepath/all-netpol-yamls.out
 kubectl $kubeconfigArg describe netpol -A > $filepath/all-netpol-descriptions.out
 
+for ns in `kubectl $kubeconfigArg get pod -A | grep -v Running | grep -v STATUS | awk '{print $1}' | sort | uniq`; do
+    echo "describing failed pods in namespace $ns..."
+    failingPods=`kubectl $kubeconfigArg get pod -n $ns | grep -v Running | grep -v STATUS | awk '{print $1}' | xargs echo`
+    if [[ -z $failingPods ]]; then
+        continue
+    fi
+    echo "failing Pods: $failingPods"
+    kubectl $kubeconfigArg describe pod -n $ns $failingPods > $filepath/describepod_$ns.out
+    break
+done
+
 npmPods=()
 nodes=()
 for npmPodOrNode in `kubectl $kubeconfigArg get pod -n kube-system -owide --output=custom-columns='Name:.metadata.name,Node:spec.nodeName' | grep "npm-win"`; do
