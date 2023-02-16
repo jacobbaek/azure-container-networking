@@ -7,7 +7,7 @@ else
 fi
 
 # NOTE: you may not be able to unzip logs.zip in Linux since it was compressed in Windows
-set -e
+set -x
 dateString=`date -I` # like 2022-09-24
 filepath=logs_$dateString
 mkdir $filepath
@@ -33,7 +33,6 @@ npmPods=()
 nodes=()
 for npmPodOrNode in `kubectl $kubeconfigArg get pod -n kube-system -owide --output=custom-columns='Name:.metadata.name,Node:spec.nodeName' | grep "npm-win"`; do
     # for loop will go over each item (npm pod, then its node, then the next npm pod, then its node, ...)
-    set +e
     echo $npmPodOrNode | grep -q azure-npm-win-
     if [ $? -eq 0 ]; then
         npmPods+=($npmPodOrNode)
@@ -41,7 +40,6 @@ for npmPodOrNode in `kubectl $kubeconfigArg get pod -n kube-system -owide --outp
         nodes+=($npmPodOrNode)
     fi
 done
-set -e
 
 echo "npm pods: ${npmPods[@]}"
 echo "nodes of npm pods: ${nodes[@]}"
