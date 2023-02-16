@@ -72,7 +72,7 @@ func (invoker *CNSIPAMInvoker) Add(addConfig IPAMAddConfig) (IPAMAddResult, erro
 		return IPAMAddResult{}, errEmptyCNIArgs
 	}
 
-	ipconfig := cns.IPConfigRequest{
+	ipconfig := cns.IPConfigsRequest{
 		OrchestratorContext: orchestratorContext,
 		PodInterfaceID:      GetEndpointID(addConfig.args),
 		InfraContainerID:    addConfig.args.ContainerID,
@@ -252,7 +252,7 @@ func (invoker *CNSIPAMInvoker) Delete(addresses []*net.IPNet, nwCfg *cni.Network
 		return errEmptyCNIArgs
 	}
 
-	req := cns.IPConfigRequest{
+	req := cns.IPConfigsRequest{
 		OrchestratorContext: orchestratorContext,
 		PodInterfaceID:      GetEndpointID(args),
 		InfraContainerID:    args.ContainerID,
