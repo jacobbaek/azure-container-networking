@@ -51,9 +51,15 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
+            - name: PING_TIMEOUT_MS
+              value: "20000"
+            - name: CHECK_TIMEOUT_MS
+              value: "20000"
+            - name: CHECK_ALL_TIMEOUT_MS
+              value: "60000"
 #            - name: HOSTS_TO_RESOLVE
 #              value: "1.1.1.1 8.8.8.8 www.bing.com"
-          image: "docker.io/bloomberg/goldpinger:v3.3.0"
+          image: "docker.io/bloomberg/goldpinger:v3.7.0"
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
