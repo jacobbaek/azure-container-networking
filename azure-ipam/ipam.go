@@ -80,11 +80,11 @@ func (p *IPAMPlugin) CmdAdd(args *cniSkel.CmdArgs) error {
 		if errors.Is(err, cnscli.ErrAPINotFound) {
 			p.logger.Error("Failed to request IPs using RequestIPs from CNS, going to try RequestIPAddress", zap.Error(err), zap.Any("request", req))
 			res, err := p.cnsClient.RequestIPAddress(context.TODO(), req)
-			
+
 			// if the old API fails as well then we just return the error
 			if err != nil {
 				p.logger.Error("Failed to request IP address from CNS using RequestIPAddress", zap.Error(err), zap.Any("request", req))
-				return cniTypes.NewError(ErrRequestIPConfigFromCNS, err.Error(), "failed to request IP address from CNS")
+				return cniTypes.NewError(ErrRequestIPConfigFromCNS, err.Error(), "failed to request IP address from CNS using RequestIPAddress")
 			}
 			// takes values from the IPConfigResponse struct and puts them in a IPConfigsResponse struct
 			resp = &cns.IPConfigsResponse{
@@ -95,7 +95,7 @@ func (p *IPAMPlugin) CmdAdd(args *cniSkel.CmdArgs) error {
 			}
 		} else {
 			p.logger.Error("Failed to request IP address from CNS", zap.Error(err), zap.Any("request", req))
-			return cniTypes.NewError(ErrRequestIPConfigFromCNS, err.Error(), "failed to request IP address from CNS")
+			return cniTypes.NewError(ErrRequestIPConfigFromCNS, err.Error(), "failed to request IP address from CNS using RequestIPs")
 		}
 	}
 	p.logger.Debug("Received CNS IP config response", zap.Any("response", resp))
@@ -112,7 +112,7 @@ func (p *IPAMPlugin) CmdAdd(args *cniSkel.CmdArgs) error {
 	for i, ipNet := range *podIPNet {
 		p.logger.Debug("Parsed pod IP", zap.String("podIPNet", ipNet.String()))
 		ipConfig := &types100.IPConfig{}
-		if ipNet.Addr().Is4() { 
+		if ipNet.Addr().Is4() {
 			ipConfig.Address = net.IPNet{
 				IP:   net.ParseIP(ipNet.Addr().String()),
 				Mask: net.CIDRMask(ipNet.Bits(), 32), // nolint
