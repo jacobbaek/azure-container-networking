@@ -26,7 +26,7 @@ type requestIPAddressHandler struct {
 
 type requestIPsHandler struct {
 	// arguments
-	ipconfigArgument cns.IPConfigRequest
+	ipconfigArgument cns.IPConfigsRequest
 
 	// results
 	result *cns.IPConfigsResponse // this will return the IPConfigsResponse which contains a slice of IPs as opposed to one IP
@@ -34,7 +34,7 @@ type requestIPsHandler struct {
 }
 
 type releaseIPsHandler struct {
-	ipconfigArgument cns.IPConfigRequest
+	ipconfigArgument cns.IPConfigsRequest
 	err              error
 }
 

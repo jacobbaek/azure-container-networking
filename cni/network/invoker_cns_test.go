@@ -17,8 +17,8 @@ import (
 
 var testPodInfo cns.KubernetesPodInfo
 
-func getTestIPConfigRequest() cns.IPConfigRequest {
-	return cns.IPConfigRequest{
+func getTestIPConfigsRequest() cns.IPConfigsRequest {
+	return cns.IPConfigsRequest{
 		PodInterfaceID:      "testcont-testifname",
 		InfraContainerID:    "testcontainerid",
 		OrchestratorContext: marshallPodInfo(testPodInfo),
@@ -54,7 +54,7 @@ func TestCNSIPAMInvoker_Add(t *testing.T) {
 				cnsClient: &MockCNSClient{
 					require: require,
 					requestIPs: requestIPsHandler{
-						ipconfigArgument: getTestIPConfigRequest(),
+						ipconfigArgument: getTestIPConfigsRequest(),
 						result: &cns.IPConfigsResponse{
 							PodIPInfo: []cns.PodIpInfo{
 								{
@@ -153,7 +153,7 @@ func TestCNSIPAMInvoker_Add(t *testing.T) {
 				cnsClient: &MockCNSClient{
 					require: require,
 					requestIPs: requestIPsHandler{
-						ipconfigArgument: getTestIPConfigRequest(),
+						ipconfigArgument: getTestIPConfigsRequest(),
 						result:           nil,
 						err:              errors.New("failed error from CNS"), //nolint "error for ut"
 					},
@@ -210,7 +210,7 @@ func TestCNSIPAMInvoker_Delete(t *testing.T) {
 				cnsClient: &MockCNSClient{
 					require: require,
 					release: releaseIPsHandler{
-						ipconfigArgument: getTestIPConfigRequest(),
+						ipconfigArgument: getTestIPConfigsRequest(),
 					},
 				},
 			},
@@ -231,7 +231,7 @@ func TestCNSIPAMInvoker_Delete(t *testing.T) {
 				podNamespace: testPodInfo.PodNamespace,
 				cnsClient: &MockCNSClient{
 					release: releaseIPsHandler{
-						ipconfigArgument: getTestIPConfigRequest(),
+						ipconfigArgument: getTestIPConfigsRequest(),
 						err:              errors.New("handle CNS delete error"), //nolint ut error
 					},
 				},
