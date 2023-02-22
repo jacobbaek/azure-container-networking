@@ -578,7 +578,7 @@ func (plugin *NetPlugin) cleanupAllocationOnError(
 	options map[string]interface{},
 ) {
 	if result != nil && len(result.IPs) > 0 {
-		addresses := make([]*net.IPNet{}, len(result.IPs))
+		addresses := make([]*net.IPNet, len(result.IPs))
 		for i, ip := range result.IPs {
 			addresses[i] = &ip.Address
 		}
@@ -587,7 +587,7 @@ func (plugin *NetPlugin) cleanupAllocationOnError(
 		}
 	}
 	if resultV6 != nil && len(resultV6.IPs) > 0 {
-		addressesV6 := make([]*net.IPNet{}, len(resultV6.IPs))
+		addressesV6 := make([]*net.IPNet, len(resultV6.IPs))
 		for i, ip := range resultV6.IPs {
 			addressesV6[i] = &ip.Address
 		}
