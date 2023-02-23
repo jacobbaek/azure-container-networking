@@ -692,13 +692,6 @@ func main() {
 		}
 	}
 
-	// Setting the remote ARP MAC address to 12-34-56-78-9a-bc on windows for external traffic
-	err = platform.SetSdnRemoteArpMacAddress()
-	if err != nil {
-		logger.Errorf("Failed to set remote ARP MAC address: %v", err)
-		return
-	}
-
 	// Initialze state in if CNS is running in CRD mode
 	// State must be initialized before we start HTTPRestService
 	if config.ChannelMode == cns.CRD {
@@ -742,6 +735,13 @@ func main() {
 			logger.Errorf("Failed to start CRD Controller, err:%v.\n", err)
 			return
 		}
+
+		// Setting the remote ARP MAC address to 12-34-56-78-9a-bc on windows for external traffic
+		err = platform.SetSdnRemoteArpMacAddress()
+		if err != nil {
+			logger.Errorf("Failed to set remote ARP MAC address: %v", err)
+			return
+		}
 	}
 
 	// Initialize multi-tenant controller if the CNS is running in MultiTenantCRD mode.
@@ -753,6 +753,12 @@ func main() {
 			return
 		}
 
+		// Setting the remote ARP MAC address to 12-34-56-78-9a-bc on windows for external traffic
+		err = platform.SetSdnRemoteArpMacAddress()
+		if err != nil {
+			logger.Errorf("Failed to set remote ARP MAC address: %v", err)
+			return
+		}
 	}
 
 	logger.Printf("[Azure CNS] Start HTTP listener")
