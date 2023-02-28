@@ -11,6 +11,34 @@ import (
 	"github.com/pkg/errors"
 )
 
+
+// CreateIPConfigReq creates an IPConfigsRequest from the given CNI args.
+func CreateIPConfigsReq(args *cniSkel.CmdArgs) (cns.IPConfigsRequest, error) {
+	podConf, err := parsePodConf(args.Args)
+	if err != nil {
+		return cns.IPConfigsRequest{}, errors.Wrapf(err, "failed to parse pod config from CNI args")
+	}
+
+	podInfo := cns.KubernetesPodInfo{
+		PodName:      string(podConf.K8S_POD_NAME),
+		PodNamespace: string(podConf.K8S_POD_NAMESPACE),
+	}
+
+	orchestratorContext, err := json.Marshal(podInfo)
+	if err != nil {
+		return cns.IPConfigsRequest{}, errors.Wrapf(err, "failed to marshal podInfo to JSON")
+	}
+
+	req := cns.IPConfigsRequest{
+		PodInterfaceID:      args.ContainerID,
+		InfraContainerID:    args.ContainerID,
+		OrchestratorContext: orchestratorContext,
+		Ifname:              args.IfName,
+	}
+
+	return req, nil
+}
+
 // CreateIPConfigReq creates an IPConfigRequest from the given CNI args.
 func CreateIPConfigReq(args *cniSkel.CmdArgs) (cns.IPConfigRequest, error) {
 	podConf, err := parsePodConf(args.Args)

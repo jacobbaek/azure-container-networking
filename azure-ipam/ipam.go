@@ -30,8 +30,9 @@ type IPAMPlugin struct {
 
 type cnsClient interface {
 	RequestIPAddress(context.Context, cns.IPConfigRequest) (*cns.IPConfigResponse, error)
-	RequestIPs(context.Context, cns.IPConfigRequest) (*cns.IPConfigsResponse, error)
-	ReleaseIPs(context.Context, cns.IPConfigRequest) error
+	RequestIPs(context.Context, cns.IPConfigsRequest) (*cns.IPConfigsResponse, error)
+	ReleaseIPs(context.Context, cns.IPConfigsRequest) error
+	ReleaseIPAddress(context.Context, cns.IPConfigRequest) error
 }
 
 // NewPlugin constructs a new IPAM plugin instance with given logger and CNS client
@@ -64,7 +65,7 @@ func (p *IPAMPlugin) CmdAdd(args *cniSkel.CmdArgs) error {
 	p.logger.Debug("Parsed network config", zap.Any("netconf", nwCfg))
 
 	// Create ip config request from args
-	req, err := ipconfig.CreateIPConfigReq(args)
+	req, err := ipconfig.CreateIPConfigsReq(args)
 	if err != nil {
 		p.logger.Error("Failed to create CNS IP config request", zap.Error(err))
 		return cniTypes.NewError(ErrCreateIPConfigRequest, err.Error(), "failed to create CNS IP config request")
@@ -79,12 +80,13 @@ func (p *IPAMPlugin) CmdAdd(args *cniSkel.CmdArgs) error {
 		// if we fail a request with a 404 error try using the old API
 		if errors.Is(err, cnscli.ErrAPINotFound) {
 			p.logger.Error("Failed to request IPs using RequestIPs from CNS, going to try RequestIPAddress", zap.Error(err), zap.Any("request", req))
-			res, err := p.cnsClient.RequestIPAddress(context.TODO(), req)
-			
+			ipconfigReq, err := ipconfig.CreateIPConfigReq(args)
+			res, err := p.cnsClient.RequestIPAddress(context.TODO(), ipconfigReq)
+
 			// if the old API fails as well then we just return the error
 			if err != nil {
-				p.logger.Error("Failed to request IP address from CNS using RequestIPAddress", zap.Error(err), zap.Any("request", req))
-				return cniTypes.NewError(ErrRequestIPConfigFromCNS, err.Error(), "failed to request IP address from CNS")
+				p.logger.Error("Failed to request IP address from CNS using RequestIPAddress", zap.Error(err), zap.Any("request", ipconfigReq))
+				return cniTypes.NewError(ErrRequestIPConfigFromCNS, err.Error(), "failed to request IP address from CNS using RequestIPAddress")
 			}
 			// takes values from the IPConfigResponse struct and puts them in a IPConfigsResponse struct
 			resp = &cns.IPConfigsResponse{
@@ -150,7 +152,7 @@ func (p *IPAMPlugin) CmdDel(args *cniSkel.CmdArgs) error {
 	p.logger.Info("DEL called", zap.Any("args", args))
 
 	// Create ip config request from args
-	req, err := ipconfig.CreateIPConfigReq(args)
+	req, err := ipconfig.CreateIPConfigsReq(args)
 	if err != nil {
 		p.logger.Error("Failed to create CNS IP config request", zap.Error(err))
 		return cniTypes.NewError(cniTypes.ErrTryAgainLater, err.Error(), "failed to create CNS IP config request")
@@ -160,8 +162,21 @@ func (p *IPAMPlugin) CmdDel(args *cniSkel.CmdArgs) error {
 	p.logger.Debug("Making request to CNS")
 	// cnsClient enforces it own timeout
 	if err := p.cnsClient.ReleaseIPs(context.TODO(), req); err != nil {
-		p.logger.Error("Failed to release IP address from CNS", zap.Error(err), zap.Any("request", req))
-		return cniTypes.NewError(cniTypes.ErrTryAgainLater, err.Error(), "failed to release IP address from CNS")
+		// if we fail a request with a 404 error try using the old API
+		if errors.Is(err, cnscli.ErrAPINotFound) {
+			p.logger.Error("Failed to release IPs using ReleaseIPs from CNS, going to try ReleaseIPAddress", zap.Error(err), zap.Any("request", req))
+			ipconfigReq, err := ipconfig.CreateIPConfigReq(args)
+			err = p.cnsClient.ReleaseIPAddress(context.TODO(), ipconfigReq)
+
+			// if the old API fails as well then we just return the error
+			if err != nil {
+				p.logger.Error("Failed to release IP address to CNS using ReleaseIPAddress", zap.Error(err), zap.Any("request", ipconfigReq))
+				return cniTypes.NewError(ErrRequestIPConfigFromCNS, err.Error(), "failed to release IP address from CNS using ReleaseIPAddress")
+			}
+		} else {
+			p.logger.Error("Failed to release IP address from CNS", zap.Error(err), zap.Any("request", req))
+			return cniTypes.NewError(cniTypes.ErrTryAgainLater, err.Error(), "failed to release IP address from CNS")
+		}
 	}
 
 	p.logger.Info("DEL success")
