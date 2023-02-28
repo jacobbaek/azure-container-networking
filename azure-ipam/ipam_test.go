@@ -89,7 +89,7 @@ func (c *MockCNSClient) RequestIPAddress(ctx context.Context, ipconfig cns.IPCon
 	}
 }
 
-func (c *MockCNSClient) RequestIPs(ctx context.Context, ipconfig cns.IPConfigRequest) (*cns.IPConfigsResponse, error) {
+func (c *MockCNSClient) RequestIPs(ctx context.Context, ipconfig cns.IPConfigsRequest) (*cns.IPConfigsResponse, error) {
 	switch ipconfig.InfraContainerID {
 	case "failRequestCNSArgs":
 		return nil, errFoo
@@ -203,7 +203,7 @@ func (c *MockCNSClient) RequestIPs(ctx context.Context, ipconfig cns.IPConfigReq
 	}
 }
 
-func (c *MockCNSClient) ReleaseIPs(ctx context.Context, ipconfig cns.IPConfigRequest) error {
+func (c *MockCNSClient) ReleaseIPs(ctx context.Context, ipconfig cns.IPConfigsRequest) error {
 	switch ipconfig.InfraContainerID {
 	case "failRequestCNSReleaseIPArgs":
 		return errFoo
