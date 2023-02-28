@@ -22,6 +22,7 @@ const (
 	// DefaultTimeout default timeout duration for CNS Client.
 	DefaultTimeout    = 5 * time.Second
 	headerContentType = "Content-Type"
+	pathNotFound	  = 404
 )
 
 var clientPaths = []string{
@@ -49,6 +50,7 @@ var clientPaths = []string{
 }
 
 var ErrAPINotFound error = errors.New("api not found")
+
 
 type do interface {
 	Do(*http.Request) (*http.Response, error)
@@ -407,12 +409,16 @@ func (c *Client) RequestIPs(ctx context.Context, ipconfig cns.IPConfigsRequest) 
 	defer res.Body.Close()
 
 	// if we get a 404 error
-	if res.StatusCode != http.StatusOK {
+	if res.StatusCode == pathNotFound {
 		return nil, ErrAPINotFound
 	}
 
 	if err != nil {
 		return nil, errors.Wrap(err, "http request failed")
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return nil, errors.Errorf("http response %d", res.StatusCode)
 	}
 
 	var response cns.IPConfigsResponse
@@ -447,12 +453,16 @@ func (c *Client) ReleaseIPs(ctx context.Context, ipconfig cns.IPConfigsRequest) 
 	defer res.Body.Close()
 
 	// if we get a 404 error
-	if res.StatusCode != http.StatusOK {
+	if res.StatusCode == pathNotFound {
 		return ErrAPINotFound
 	}
 
 	if err != nil {
 		return errors.Wrap(err, "http request failed")
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return errors.Errorf("http response %d", res.StatusCode)
 	}
 
 	var resp cns.Response
