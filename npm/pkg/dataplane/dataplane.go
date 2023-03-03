@@ -461,12 +461,6 @@ func (dp *DataPlane) updateIPSetsToAdd(npmPod *updateNPMPod, setNames []*ipsets.
 	for _, set := range setNames {
 		npmPod.IPSetsToAdd[set.GetPrefixName()] = struct{}{}
 		// keep all PoliciesToRemove
-		// NOTE: this logic depends on dp.updatePod() handling PoliciesToRemove first, then IPSetsToAdd
-		// for example, take this sequence where NetPol has selector with set1:
-		// 1. Pod part of set1. NetPol applied.
-		// 2. Pod removed from set1. Refresh Endpoints fails, and the NetPol is not removed.
-		// 3. NetPol updated. Refresh Endpoints still fails, and the NetPol is not removed.
-		// 4. Pod added back to set1. Refresh Endpoints succeeds. The old version of the NetPol must be removed and the new version applied.
 	}
 }
 
