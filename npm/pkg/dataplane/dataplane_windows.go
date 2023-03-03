@@ -154,7 +154,7 @@ func (dp *DataPlane) updatePod(pod *updateNPMPod) error {
 	}
 
 	// for every ipset we're removing from the endpoint, remove from the endpoint any policy that requires the set
-	for _, setName := range pod.IPSetsToRemove {
+	for setName := range pod.IPSetsToRemove {
 		/*
 			Scenarios:
 			1. There's a chance a policy is/was just removed, but the ipset's selector hasn't been updated yet.
@@ -195,7 +195,7 @@ func (dp *DataPlane) updatePod(pod *updateNPMPod) error {
 
 	// for every ipset we're adding to the endpoint, consider adding to the endpoint every policy that the set touches
 	toAddPolicies := make(map[string]struct{})
-	for _, setName := range pod.IPSetsToAdd {
+	for setName := range pod.IPSetsToAdd {
 		/*
 			Scenarios:
 			1. If a policy is added to the ipset's selector after getting the selector (meaning dp.AddPolicy() was called),

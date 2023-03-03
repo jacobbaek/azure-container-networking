@@ -32,8 +32,8 @@ type GenericDataplane interface {
 // this helps in calculating if any update needs to have policies applied or removed
 type updateNPMPod struct {
 	*PodMetadata
-	IPSetsToAdd    []string
-	IPSetsToRemove []string
+	IPSetsToAdd    map[string]struct{}
+	IPSetsToRemove map[string]struct{}
 }
 
 // PodMetadata is what is passed to dataplane to specify pod ipset
@@ -60,19 +60,26 @@ func (p *PodMetadata) Namespace() string {
 func newUpdateNPMPod(podMetadata *PodMetadata) *updateNPMPod {
 	return &updateNPMPod{
 		PodMetadata:    podMetadata,
-		IPSetsToAdd:    make([]string, 0),
-		IPSetsToRemove: make([]string, 0),
+		IPSetsToAdd:    make(map[string]struct{}),
+		IPSetsToRemove: make(map[string]struct{}),
 	}
 }
 
 func (npmPod *updateNPMPod) updateIPSetsToAdd(setNames []*ipsets.IPSetMetadata) {
 	for _, set := range setNames {
-		npmPod.IPSetsToAdd = append(npmPod.IPSetsToAdd, set.GetPrefixName())
+		npmPod.IPSetsToAdd[set.GetPrefixName()] = struct{}{}
+		// keep all IPSetsToRemove
+		// for example, take this sequence where NetPol has selector with set1:
+		// 1. Pod part of set1. NetPol applied.
+		// 2. Pod removed from set1. Refresh Endpoints fails, and the NetPol is not removed.
+		// 3. NetPol updated. Refresh Endpoints still fails, and the NetPol is not removed.
+		// 4. Pod added back to set1. Refresh Endpoints succeeds. The old version of the NetPol must be removed and the new version applied.
 	}
 }
 
 func (npmPod *updateNPMPod) updateIPSetsToRemove(setNames []*ipsets.IPSetMetadata) {
 	for _, set := range setNames {
-		npmPod.IPSetsToRemove = append(npmPod.IPSetsToRemove, set.GetPrefixName())
+		npmPod.IPSetsToRemove[set.GetPrefixName()] = struct{}{}
+		delete(npmPod.IPSetsToAdd, set.GetPrefixName())
 	}
 }
