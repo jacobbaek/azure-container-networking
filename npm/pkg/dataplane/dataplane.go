@@ -149,7 +149,7 @@ func (dp *DataPlane) AddToSets(setNames []*ipsets.IPSetMetadata, podMetadata *Po
 			dp.updatePodCache.cache[podMetadata.PodKey] = updatePod
 		}
 
-		updatePod.updateIPSetsToAdd(setNames)
+		dp.updateIPSetsToAdd(updatePod, setNames)
 	}
 
 	return nil
@@ -177,7 +177,7 @@ func (dp *DataPlane) RemoveFromSets(setNames []*ipsets.IPSetMetadata, podMetadat
 			dp.updatePodCache.cache[podMetadata.PodKey] = updatePod
 		}
 
-		updatePod.updateIPSetsToRemove(setNames)
+		dp.updateIPSetsToRemove(updatePod, setNames)
 	}
 
 	return nil
@@ -455,4 +455,37 @@ func (dp *DataPlane) deleteIPSetsAndReferences(sets []*ipsets.TranslatedIPSet, n
 		dp.ipsetMgr.DeleteIPSet(set.Metadata.GetPrefixName(), false)
 	}
 	return nil
+}
+
+func (dp *DataPlane) updateIPSetsToAdd(npmPod *updateNPMPod, setNames []*ipsets.IPSetMetadata) {
+	for _, set := range setNames {
+		npmPod.IPSetsToAdd[set.GetPrefixName()] = struct{}{}
+		// keep all PoliciesToRemove
+		// NOTE: this logic depends on dp.updatePod() handling PoliciesToRemove first, then IPSetsToAdd
+		// for example, take this sequence where NetPol has selector with set1:
+		// 1. Pod part of set1. NetPol applied.
+		// 2. Pod removed from set1. Refresh Endpoints fails, and the NetPol is not removed.
+		// 3. NetPol updated. Refresh Endpoints still fails, and the NetPol is not removed.
+		// 4. Pod added back to set1. Refresh Endpoints succeeds. The old version of the NetPol must be removed and the new version applied.
+	}
+}
+
+func (dp *DataPlane) updateIPSetsToRemove(npmPod *updateNPMPod, setNames []*ipsets.IPSetMetadata) {
+	for _, set := range setNames {
+		// remove from IPSetsToAdd
+		delete(npmPod.IPSetsToAdd, set.GetPrefixName())
+
+		// get selector reference here instead of after ApplyIPSets() so multiple ApplyDataPlane() calls don't block each other
+		// i.e. thread 1 finishes ApplyIPSets(), thread 2 starts ApplyIPsets(), thread 1 must wait to get selector references until thread 2 finishes
+		selectorReference, err := dp.ipsetMgr.GetSelectorReferencesBySet(set.GetPrefixName())
+		if err != nil {
+			// ignore this set since it may have been deleted in the background reconcile thread
+			klog.Infof("[DataPlane] ignoring ipset to remove since the set does not exist. pod: %+v. set: %s", npmPod, set.GetPrefixName())
+			continue
+		}
+
+		for policyKey := range selectorReference {
+			npmPod.PoliciesToRemove[policyKey] = struct{}{}
+		}
+	}
 }
