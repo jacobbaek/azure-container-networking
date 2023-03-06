@@ -11,7 +11,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-
 // CreateIPConfigReq creates an IPConfigsRequest from the given CNI args.
 func CreateIPConfigsReq(args *cniSkel.CmdArgs) (cns.IPConfigsRequest, error) {
 	podConf, err := parsePodConf(args.Args)
