@@ -766,8 +766,9 @@ func (plugin *NetPlugin) createEndpointInternal(opt *createEndpointInternalOpt) 
 		epInfo.IPAddresses = append(epInfo.IPAddresses, ipconfig.Address)
 	}
 
+	log.Printf("epInfo.IPV6Mode is %s", epInfo.IPV6Mode)
 	if opt.resultV6 != nil {
-		epInfo.IPV6Mode = "dualstack"
+		// epInfo.IPV6Mode = "dualstack"
 		for _, ipconfig := range opt.resultV6.IPs {
 			epInfo.IPAddresses = append(epInfo.IPAddresses, ipconfig.Address)
 		}
@@ -1041,12 +1042,14 @@ func (plugin *NetPlugin) Delete(args *cniSkel.CmdArgs) error {
 
 		if !nwCfg.MultiTenancy {
 			// Call into IPAM plugin to release the endpoint's addresses.
+			addresses := make([]*net.IPNet, len(epInfo.IPAddresses))
 			for i := range epInfo.IPAddresses {
+				addresses[i] = &epInfo.IPAddresses[i]
 				logAndSendEvent(plugin, fmt.Sprintf("Release ip:%s", epInfo.IPAddresses[i].IP.String()))
-				err = plugin.ipamInvoker.Delete(&epInfo.IPAddresses[i], nwCfg, args, nwInfo.Options)
-				if err != nil {
-					return plugin.RetriableError(fmt.Errorf("failed to release address: %w", err))
-				}
+			}
+			err = plugin.ipamInvoker.Delete(addresses, nwCfg, args, nwInfo.Options)
+			if err != nil {
+				return plugin.RetriableError(fmt.Errorf("failed to release address: %w", err))
 			}
 		} else if epInfo.EnableInfraVnet {
 			nwCfg.IPAM.Subnet = nwInfo.Subnets[0].Prefix.String()
