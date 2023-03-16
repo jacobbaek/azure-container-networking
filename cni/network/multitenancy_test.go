@@ -52,10 +52,10 @@ type getAllNetworkContainersConfigurationHandler struct {
 }
 
 type MockCNSClient struct {
-	require                 *require.Assertions
-	request                 requestIPAddressHandler
-	requestIPs              requestIPsHandler
-	release                 releaseIPAddressHandler
+	require                              *require.Assertions
+	request                              requestIPAddressHandler
+	requestIPs                           requestIPsHandler
+	release                              releaseIPsHandler
 	getNetworkContainerConfiguration     getNetworkContainerConfigurationHandler
 	getAllNetworkContainersConfiguration getAllNetworkContainersConfigurationHandler
 }

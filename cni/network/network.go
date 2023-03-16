@@ -767,8 +767,10 @@ func (plugin *NetPlugin) createEndpointInternal(opt *createEndpointInternalOpt) 
 	}
 
 	log.Printf("epInfo.IPV6Mode is %s", epInfo.IPV6Mode)
+
 	if opt.resultV6 != nil {
-		// epInfo.IPV6Mode = "dualstack"
+		// inject routes to linux pod
+		epInfo.IPV6Mode = "dualstack"
 		for _, ipconfig := range opt.resultV6.IPs {
 			epInfo.IPAddresses = append(epInfo.IPAddresses, ipconfig.Address)
 		}
