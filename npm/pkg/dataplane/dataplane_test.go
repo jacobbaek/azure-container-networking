@@ -249,6 +249,36 @@ func TestUpdatePolicy(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestUpdatePodCacheCleanupOrder(t *testing.T) {
+	upc := newUpdatePodCache()
+
+	pod1 := newUpdateNPMPod(NewPodMetadata("x/a", "10.0.0.1", nodeName))
+	pod2 := newUpdateNPMPod(NewPodMetadata("x/b", "10.0.0.2", nodeName))
+	pod3 := newUpdateNPMPod(NewPodMetadata("x/c", "10.0.0.3", nodeName))
+
+	upc.cache[pod1.PodKey] = pod1
+	upc.cache[pod2.PodKey] = pod2
+	upc.cache[pod3.PodKey] = pod3
+
+	upc.order = append(upc.order, pod1.PodKey)
+	upc.order = append(upc.order, pod2.PodKey)
+	upc.order = append(upc.order, pod3.PodKey)
+
+	require.Equal(t, 3, len(upc.order))
+
+	upc.cleanupOrder()
+	require.Equal(t, 3, len(upc.order))
+
+	delete(upc.cache, pod2.PodKey)
+	upc.cleanupOrder()
+	require.Equal(t, 2, len(upc.order))
+
+	delete(upc.cache, pod1.PodKey)
+	delete(upc.cache, pod3.PodKey)
+	upc.cleanupOrder()
+	require.Equal(t, 0, len(upc.order))
+}
+
 func getBootupTestCalls() []testutils.TestCmd {
 	return append(policies.GetBootupTestCalls(), ipsets.GetResetTestCalls()...)
 }
