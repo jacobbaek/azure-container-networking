@@ -260,9 +260,7 @@ func TestUpdatePodCacheCleanupOrder(t *testing.T) {
 	upc.cache[pod2.PodKey] = pod2
 	upc.cache[pod3.PodKey] = pod3
 
-	upc.order = append(upc.order, pod1.PodKey)
-	upc.order = append(upc.order, pod2.PodKey)
-	upc.order = append(upc.order, pod3.PodKey)
+	upc.order = append(upc.order, pod1.PodKey, pod2.PodKey, pod3.PodKey)
 
 	require.Equal(t, 3, len(upc.order))
 
