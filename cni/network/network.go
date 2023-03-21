@@ -635,7 +635,7 @@ func (plugin *NetPlugin) createNetworkInternal(
 		return nwInfo, fmt.Errorf("Failed to ParseCIDR for pod subnet prefix: %w", err)
 	}
 
-	// only parse the ipv6 address and add it to nwInfo if it's dual stack mode
+	// parse the ipv6 address and only add it to nwInfo if it's dual stack mode
 	var podSubnetV6Prefix *net.IPNet
 	if ipamAddResult.ipv6Result != nil && len(ipamAddResult.ipv6Result.IPs) > 0 {
 		_, podSubnetV6Prefix, err = net.ParseCIDR(ipamAddResult.ipv6Result.IPs[0].Address.String())
@@ -1047,8 +1047,8 @@ func (plugin *NetPlugin) Delete(args *cniSkel.CmdArgs) error {
 			addresses := make([]*net.IPNet, len(epInfo.IPAddresses))
 			for i := range epInfo.IPAddresses {
 				addresses[i] = &epInfo.IPAddresses[i]
-				logAndSendEvent(plugin, fmt.Sprintf("Release ip:%s", epInfo.IPAddresses[i].IP.String()))
 			}
+			logAndSendEvent(plugin, fmt.Sprintf("Releasing ips:%+v", epInfo.IPAddresses))
 			err = plugin.ipamInvoker.Delete(addresses, nwCfg, args, nwInfo.Options)
 			if err != nil {
 				return plugin.RetriableError(fmt.Errorf("failed to release address: %w", err))

@@ -106,7 +106,7 @@ func (invoker *CNSIPAMInvoker) Add(addConfig IPAMAddConfig) (IPAMAddResult, erro
 
 		ncgw := net.ParseIP(info.ncGatewayIPAddress)
 		if ncgw == nil {
-			if (invoker.ipamMode != util.V4Overlay) && (invoker.ipamMode != util.DualModeOverlay) {
+			if (invoker.ipamMode != util.V4Overlay) && (invoker.ipamMode != util.DualStackOverlay) {
 				return IPAMAddResult{}, errors.Wrap(errInvalidArgs, "%w: Gateway address "+info.ncGatewayIPAddress+" from response is invalid")
 			}
 
@@ -118,7 +118,7 @@ func (invoker *CNSIPAMInvoker) Add(addConfig IPAMAddConfig) (IPAMAddResult, erro
 		}
 
 		// set result ipconfigArgument from CNS Response Body
-		ip, ncipnet, err := net.ParseCIDR(info.podIPAddress + "/" + fmt.Sprint(info.ncSubnetPrefix))
+		ip, ncIPNet, err := net.ParseCIDR(info.podIPAddress + "/" + fmt.Sprint(info.ncSubnetPrefix))
 		if ip == nil {
 			return IPAMAddResult{}, errors.Wrap(err, "Unable to parse IP from response: "+info.podIPAddress+" with err %w")
 		}
@@ -126,7 +126,7 @@ func (invoker *CNSIPAMInvoker) Add(addConfig IPAMAddConfig) (IPAMAddResult, erro
 		// construct ipnet for result
 		resultIPnet := net.IPNet{
 			IP:   ip,
-			Mask: ncipnet.Mask,
+			Mask: ncIPNet.Mask,
 		}
 
 		if net.ParseIP(info.podIPAddress).To4() != nil {
@@ -171,8 +171,8 @@ func (invoker *CNSIPAMInvoker) Add(addConfig IPAMAddConfig) (IPAMAddResult, erro
 
 		// set subnet prefix for host vm
 		// setHostOptions will execute if IPAM mode is not v4 overlay
-		if (invoker.ipamMode != util.V4Overlay) && (invoker.ipamMode != util.DualModeOverlay) {
-			if err := setHostOptions(ncipnet, addConfig.options, &info); err != nil {
+		if (invoker.ipamMode != util.V4Overlay) && (invoker.ipamMode != util.DualStackOverlay) {
+			if err := setHostOptions(ncIPNet, addConfig.options, &info); err != nil {
 				return IPAMAddResult{}, err
 			}
 		}
