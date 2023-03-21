@@ -38,19 +38,23 @@ steps:
     displayName: "Create cluster and retrieve credentials"
 
   - script: |
-      set -e
-      kubectl get daemonset -n kube-system
+      echo "[Delete daemonset]"      
       kubectl delete daemonset azure-cns-win -n kube-system
       kubectl get daemonset -n kube-system
+      echo "[Updated CNS daemonset to apply]"
       envsubst < cns/azure-cns-windows.yaml | cat
+      echo "[Apply daemonset]"
       envsubst < cns/azure-cns-windows.yaml | kubectl apply -f -
-      kubectl get daemonset -n kube-system
+      kubectl rollout status daemonset azure-cns-win -n kube-system --timeout 600s
     displayName: "Update CNS in windows pool"
 
   - script: |
-      set -e
+      echo "[CNI updater daemonset to apply]"
+      envsubst < cni/templates/upgrade-cni-daemonset.yaml | cat
+      echo "[Apply daemonset]"
       envsubst < cni/templates/upgrade-cni-daemonset.yaml | kubectl apply -f -
-      kubectl rollout status daemonset azure-cni-updater-windows -n kube-system --timeout 600s      
+      kubectl rollout status daemonset azure-cni-updater-windows -n kube-system --timeout 600s
+      echo "[Delete daemonset]"
       kubectl delete daemonset azure-cni-updater-windows -n kube-system
     displayName: "Update CNI in windows pool"
 
@@ -72,4 +76,15 @@ steps:
         --focus-regex "Services.*\[Conformance\].*"
     displayName: "Run Services Conformance Tests"
 
+  - task: AzureCLI@2
+    inputs:
+      azureSubscription: "Azure Container Networking - Test"
+      scriptLocation: "inlineScript"
+      scriptType: "bash"
+      addSpnToEnvironment: true
+      inlineScript: |
+        make -C ./hack/swift azcfg AZCLI=az REGION=$(REGION_AKS_CLUSTER_TEST)
+        make -C ./hack/swift down AZCLI=az REGION=$(REGION_AKS_CLUSTER_TEST) SUB=$(SUB_AZURE_NETWORK_AGENT_TEST) CLUSTER=${{ parameters.clusterName }}-$(make revision)
+    displayName: "Cleanup cluster"
+    condition: always()
 
