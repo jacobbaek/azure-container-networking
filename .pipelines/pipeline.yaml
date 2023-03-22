@@ -334,10 +334,10 @@ stages:
       clusterName: "swifte2e"
       osSku: "Ubuntu"
 
-  - template: singletenancy/aks-non-swift/e2e-job-template.yaml
+  - template: singletenancy/aks-swift-windows/e2e-job-template.yaml
     parameters:
-      name: "aks_non_swift_windows"
-      displayName: AKS non-swift windows
+      name: "aks_swift_windows"
+      displayName: AKS swift windows
       clusterName: "nonswiftwin"
       osSku: "Ubuntu"
 

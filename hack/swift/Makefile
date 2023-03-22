@@ -139,6 +139,8 @@ byocniwin-up: rg-up swift-net-up ## Bring up a windows SWIFT BYO CNI cluster
 		--node-vm-size $(VM_SIZE) \
 		--network-plugin azure \
 		--generate-ssh-keys \
+		--windows-admin-username azure \
+		--windows-admin-password "replacePassword1234!" \
 		--vnet-subnet-id /subscriptions/$(SUB)/resourceGroups/$(GROUP)/providers/Microsoft.Network/virtualNetworks/$(VNET)/subnets/nodenet \
 		--pod-subnet-id /subscriptions/$(SUB)/resourceGroups/$(GROUP)/providers/Microsoft.Network/virtualNetworks/$(VNET)/subnets/podnet \
 		--os-sku $(OS_SKU) \

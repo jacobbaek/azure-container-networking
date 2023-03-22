@@ -30,11 +30,11 @@ stages:
               buildType: 'current'
               downloadType: 'single'
               artifactName: 'output'
-              itemPattern: '**/azure-vnet-cni-windows-amd64-$(TAG).zip'
+              itemPattern: '**/azure-vnet-cni-swift-windows-amd64-$(TAG).zip'
               downloadPath: '$(Agent.TempDirectory)'
           - task: ExtractFiles@1
             inputs:
-              archiveFilePatterns: '$(Agent.TempDirectory)/bins/azure-vnet-cni-windows-amd64-$(TAG).zip'
+              archiveFilePatterns: '$(Agent.TempDirectory)/bins/azure-vnet-cni-swift-windows-amd64-$(TAG).zip'
               destinationFolder: '$(Agent.TempDirectory)'
               cleanDestinationFolder: false
               workingDirectory: '$(Agent.TempDirectory)'

@@ -67,6 +67,10 @@ steps:
       inlineScript: |        
         make -C ./hack/swift azcfg AZCLI=az REGION=$(REGION_AKS_CLUSTER_TEST)
         make -C ./hack/swift restart-nodepool-vmss AZCLI=az CLUSTER=${{ parameters.clusterName }}-$(make revision) VMSS=akswinpl
+        echo ["Nodes status"]
+        kubectl get node -A
+        echo ["Pods status"]
+        kubectl get pod -A
     displayName: "Restart windows nodepool"
 
   - script: |      
@@ -76,15 +80,4 @@ steps:
         --focus-regex "Services.*\[Conformance\].*"
     displayName: "Run Services Conformance Tests"
 
-  - task: AzureCLI@2
-    inputs:
-      azureSubscription: "Azure Container Networking - Test"
-      scriptLocation: "inlineScript"
-      scriptType: "bash"
-      addSpnToEnvironment: true
-      inlineScript: |
-        make -C ./hack/swift azcfg AZCLI=az REGION=$(REGION_AKS_CLUSTER_TEST)
-        make -C ./hack/swift down AZCLI=az REGION=$(REGION_AKS_CLUSTER_TEST) SUB=$(SUB_AZURE_NETWORK_AGENT_TEST) CLUSTER=${{ parameters.clusterName }}-$(make revision)
-    displayName: "Cleanup cluster"
-    condition: always()
 
