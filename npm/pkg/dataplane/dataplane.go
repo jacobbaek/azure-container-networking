@@ -14,16 +14,14 @@ import (
 	"k8s.io/klog"
 )
 
-const (
-	reconcileDuration         = time.Duration(5 * time.Minute)
-	applyDataplaneMaxDuration = time.Duration(100 * time.Millisecond)
-	applyDataplaneMaxCount    = 20
-)
+const reconcileDuration = time.Duration(5 * time.Minute)
 
 type PolicyMode string
 
 // TODO put NodeName in Config?
 type Config struct {
+	ApplyDataPlaneMaxCount    int
+	ApplyDataPlaneMaxDuration time.Duration
 	*ipsets.IPSetManagerCfg
 	*policies.PolicyManagerCfg
 }
@@ -85,8 +83,14 @@ func NewDataPlane(nodeName string, ioShim *common.IOShim, cfg *Config, stopChann
 		nodeName:       nodeName,
 		ioShim:         ioShim,
 		updatePodCache: newUpdatePodCache(),
-		applyCounter:   newApplyCounter(applyDataplaneMaxCount),
+		applyCounter:   newApplyCounter(cfg.ApplyDataPlaneMaxCount),
 		stopChannel:    stopChannel,
+	}
+
+	if dp.shouldApplyDataPlaneInBackground() {
+		klog.Infof("[DataPlane] dataplane configured to apply in background every %v", dp.ApplyDataPlaneMaxDuration)
+	} else {
+		klog.Info("[DataPlane] dataplane configured to NOT apply in background")
 	}
 
 	err := dp.BootupDataplane()
@@ -127,8 +131,12 @@ func (dp *DataPlane) RunPeriodicTasks() {
 		}
 	}()
 
+	if !dp.shouldApplyDataPlaneInBackground() {
+		return
+	}
+
 	go func() {
-		ticker := time.NewTicker(applyDataplaneMaxDuration)
+		ticker := time.NewTicker(dp.ApplyDataPlaneMaxDuration)
 		defer ticker.Stop()
 
 		for {
@@ -239,6 +247,10 @@ func (dp *DataPlane) RemoveFromList(listName *ipsets.IPSetMetadata, setNames []*
 // and accordingly makes changes in dataplane. This function helps emulate a single call to
 // dataplane instead of multiple ipset operations calls ipset operations calls to dataplane
 func (dp *DataPlane) ApplyDataPlane() error {
+	if !util.IsWindowsDP() {
+		return dp.applyDataPlaneNow()
+	}
+
 	dp.applyCounter.Lock()
 	defer dp.applyCounter.Unlock()
 	dp.applyCounter.count++
@@ -510,4 +522,8 @@ func (dp *DataPlane) deleteIPSetsAndReferences(sets []*ipsets.TranslatedIPSet, n
 		dp.ipsetMgr.DeleteIPSet(set.Metadata.GetPrefixName(), false)
 	}
 	return nil
+}
+
+func (dp *DataPlane) shouldApplyDataPlaneInBackground() bool {
+	return util.IsWindowsDP() && dp.ApplyDataPlaneMaxCount > 0 && dp.ApplyDataPlaneMaxDuration > 0
 }
