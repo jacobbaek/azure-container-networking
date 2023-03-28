@@ -14,7 +14,11 @@ import (
 	"k8s.io/klog"
 )
 
-const reconcileTimeInMinutes int = 5
+const (
+	reconcileDuration         = time.Duration(5 * time.Minute)
+	applyDataplaneMaxDuration = time.Duration(100 * time.Millisecond)
+	applyDataplaneMaxCount    = 20
+)
 
 type PolicyMode string
 
@@ -42,6 +46,16 @@ func newEndpointCache() *endpointCache {
 	return &endpointCache{cache: make(map[string]*npmEndpoint)}
 }
 
+type applyCounter struct {
+	sync.Mutex
+	count    int
+	maxCount int
+}
+
+func newApplyCounter(maxCount int) *applyCounter {
+	return &applyCounter{maxCount: maxCount}
+}
+
 type DataPlane struct {
 	*Config
 	policyMgr *policies.PolicyManager
@@ -53,6 +67,7 @@ type DataPlane struct {
 	endpointCache  *endpointCache
 	ioShim         *common.IOShim
 	updatePodCache *updatePodCache
+	applyCounter   *applyCounter
 	stopChannel    <-chan struct{}
 }
 
@@ -70,6 +85,7 @@ func NewDataPlane(nodeName string, ioShim *common.IOShim, cfg *Config, stopChann
 		nodeName:       nodeName,
 		ioShim:         ioShim,
 		updatePodCache: newUpdatePodCache(),
+		applyCounter:   newApplyCounter(applyDataplaneMaxCount),
 		stopChannel:    stopChannel,
 	}
 
@@ -90,7 +106,7 @@ func (dp *DataPlane) BootupDataplane() error {
 // RunPeriodicTasks runs periodic tasks. Should only be called once.
 func (dp *DataPlane) RunPeriodicTasks() {
 	go func() {
-		ticker := time.NewTicker(time.Minute * time.Duration(reconcileTimeInMinutes))
+		ticker := time.NewTicker(reconcileDuration)
 		defer ticker.Stop()
 
 		for {
@@ -107,6 +123,20 @@ func (dp *DataPlane) RunPeriodicTasks() {
 				// in Windows, does nothing
 				// in Linux, locks policy manager but can be interrupted
 				dp.policyMgr.Reconcile()
+			}
+		}
+	}()
+
+	go func() {
+		ticker := time.NewTicker(applyDataplaneMaxDuration)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-dp.stopChannel:
+				return
+			case <-ticker.C:
+				dp.applyDataPlaneNow()
 			}
 		}
 	}()
@@ -209,10 +239,27 @@ func (dp *DataPlane) RemoveFromList(listName *ipsets.IPSetMetadata, setNames []*
 // and accordingly makes changes in dataplane. This function helps emulate a single call to
 // dataplane instead of multiple ipset operations calls ipset operations calls to dataplane
 func (dp *DataPlane) ApplyDataPlane() error {
+	dp.applyCounter.Lock()
+	defer dp.applyCounter.Unlock()
+	dp.applyCounter.count++
+	klog.Infof("[DataPlane] [ApplyDataPlane] new apply count: %d", dp.applyCounter.count)
+	if dp.applyCounter.count >= dp.applyCounter.maxCount {
+		klog.Infof("[DataPlane] [ApplyDataPlane] applying now since max count reached")
+		return dp.applyDataPlaneNow()
+	}
+	return nil
+}
+
+func (dp *DataPlane) applyDataPlaneNow() error {
+	dp.applyCounter.Lock()
+	defer dp.applyCounter.Unlock()
+
 	err := dp.ipsetMgr.ApplyIPSets()
 	if err != nil {
 		return fmt.Errorf("[DataPlane] error while applying IPSets: %w", err)
 	}
+
+	dp.applyCounter.count = 0
 
 	// NOTE: ideally we won't refresh Pod Endpoints if the updatePodCache is empty
 	if dp.shouldUpdatePod() {
@@ -270,7 +317,7 @@ func (dp *DataPlane) AddPolicy(policy *policies.NPMNetworkPolicy) error {
 
 	// NOTE: if apply dataplane succeeds, but another area fails, then currently,
 	// netpol controller won't cache the netpol, and the IPSets applied will remain in the kernel since they will have a netpol reference
-	err = dp.ApplyDataPlane()
+	err = dp.applyDataPlaneNow()
 	if err != nil {
 		return fmt.Errorf("[DataPlane] error while applying dataplane: %w", err)
 	}
