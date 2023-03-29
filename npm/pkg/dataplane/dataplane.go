@@ -28,8 +28,8 @@ type PolicyMode string
 
 // TODO put NodeName in Config?
 type Config struct {
-	ApplyDataPlaneMaxCount    int
-	ApplyDataPlaneMaxDuration time.Duration
+	ApplyDataPlaneMaxCount int
+	ApplyDataPlaneInterval time.Duration
 	*ipsets.IPSetManagerCfg
 	*policies.PolicyManagerCfg
 }
@@ -91,7 +91,7 @@ func NewDataPlane(nodeName string, ioShim *common.IOShim, cfg *Config, stopChann
 	}
 
 	if dp.shouldApplyDataPlaneInBackground() {
-		klog.Infof("[DataPlane] dataplane configured to apply in background every %v or every %d calls to ApplyDataPlane()", dp.ApplyDataPlaneMaxDuration, dp.ApplyDataPlaneMaxCount)
+		klog.Infof("[DataPlane] dataplane configured to apply in background every %v or every %d calls to ApplyDataPlane()", dp.ApplyDataPlaneInterval, dp.ApplyDataPlaneMaxCount)
 	} else {
 		klog.Info("[DataPlane] dataplane configured to NOT apply in background")
 	}
@@ -139,7 +139,7 @@ func (dp *DataPlane) RunPeriodicTasks() {
 	}
 
 	go func() {
-		ticker := time.NewTicker(dp.ApplyDataPlaneMaxDuration)
+		ticker := time.NewTicker(dp.ApplyDataPlaneInterval)
 		defer ticker.Stop()
 
 		for {
@@ -250,7 +250,7 @@ func (dp *DataPlane) RemoveFromList(listName *ipsets.IPSetMetadata, setNames []*
 // and accordingly makes changes in dataplane. This function helps emulate a single call to
 // dataplane instead of multiple ipset operations calls ipset operations calls to dataplane
 func (dp *DataPlane) ApplyDataPlane() error {
-	if !util.IsWindowsDP() {
+	if !dp.shouldApplyDataPlaneInBackground() {
 		return dp.applyDataPlaneNow(applyAlways, applyContextApplyDP)
 	}
 
@@ -269,7 +269,7 @@ func (dp *DataPlane) ApplyDataPlane() error {
 }
 
 func (dp *DataPlane) applyDataPlaneNow(checkApplyCount bool, context string) error {
-	if util.IsWindowsDP() {
+	if dp.shouldApplyDataPlaneInBackground() {
 		dp.applyCounter.Lock()
 		currentCount := dp.applyCounter.count
 		dp.applyCounter.Unlock()
@@ -286,7 +286,7 @@ func (dp *DataPlane) applyDataPlaneNow(checkApplyCount bool, context string) err
 	}
 	klog.Infof("[DataPlane] [ApplyDataPlane] [%s] finished applying ipsets", context)
 
-	if util.IsWindowsDP() {
+	if dp.shouldApplyDataPlaneInBackground() {
 		dp.applyCounter.Lock()
 		dp.applyCounter.count = 0
 		dp.applyCounter.Unlock()
@@ -552,5 +552,5 @@ func (dp *DataPlane) deleteIPSetsAndReferences(sets []*ipsets.TranslatedIPSet, n
 }
 
 func (dp *DataPlane) shouldApplyDataPlaneInBackground() bool {
-	return util.IsWindowsDP() && dp.ApplyDataPlaneMaxCount > 0 && dp.ApplyDataPlaneMaxDuration > 0
+	return util.IsWindowsDP() && dp.ApplyDataPlaneMaxCount > 0 && dp.ApplyDataPlaneInterval > 0
 }

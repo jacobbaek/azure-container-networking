@@ -124,7 +124,7 @@ func start(config npmconfig.Config, flags npmconfig.Flags) error {
 	if config.Toggles.EnableV2NPM {
 		// update the dataplane config
 		npmV2DataplaneCfg.ApplyDataPlaneMaxCount = config.ApplyDataPlaneMaxCount
-		npmV2DataplaneCfg.ApplyDataPlaneMaxDuration = time.Duration(config.ApplyDataPlaneMaxWaitInMilliseconds * int(time.Millisecond))
+		npmV2DataplaneCfg.ApplyDataPlaneInterval = time.Duration(config.ApplyDataPlaneIntervalInMilliseconds * int(time.Millisecond))
 
 		if config.WindowsNetworkName == "" {
 			npmV2DataplaneCfg.NetworkName = util.AzureNetworkName
