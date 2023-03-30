@@ -23,8 +23,7 @@ import (
 var (
 	errEmptyCNIArgs    = errors.New("empty CNI cmd args not allowed")
 	errInvalidArgs     = errors.New("invalid arg(s)")
-	overlayGatewayv4IP = "169.254.1.1"
-	overlayGatewayv6IP = "fe80::1234:5678:9abc"
+	overlayGatewayV6IP = "fe80::1234:5678:9abc"
 )
 
 type CNSIPAMInvoker struct {
@@ -130,6 +129,12 @@ func (invoker *CNSIPAMInvoker) Add(addConfig IPAMAddConfig) (IPAMAddResult, erro
 
 		log.Printf("[cni-invoker-cns] Received info %+v for pod %v", info, podInfo)
 
+		// set result ipconfigArgument from CNS Response Body
+		ip, ncIPNet, err := net.ParseCIDR(info.podIPAddress + "/" + fmt.Sprint(info.ncSubnetPrefix))
+		if ip == nil {
+			return IPAMAddResult{}, errors.Wrap(err, "Unable to parse IP from response: "+info.podIPAddress+" with err %w")
+		}
+
 		ncgw := net.ParseIP(info.ncGatewayIPAddress)
 		if ncgw == nil {
 			if (invoker.ipamMode != util.V4Overlay) && (invoker.ipamMode != util.DualStackOverlay) {
@@ -137,16 +142,13 @@ func (invoker *CNSIPAMInvoker) Add(addConfig IPAMAddConfig) (IPAMAddResult, erro
 			}
 
 			if net.ParseIP(info.podIPAddress).To4() != nil {
-				ncgw = net.ParseIP(overlayGatewayv4IP)
+				ncgw, err = getOverlayGateway(ncIPNet)
+				if err != nil {
+					return IPAMAddResult{}, err
+				}
 			} else {
-				ncgw = net.ParseIP(overlayGatewayv6IP)
+				ncgw = net.ParseIP(overlayGatewayV6IP)
 			}
-		}
-
-		// set result ipconfigArgument from CNS Response Body
-		ip, ncIPNet, err := net.ParseCIDR(info.podIPAddress + "/" + fmt.Sprint(info.ncSubnetPrefix))
-		if ip == nil {
-			return IPAMAddResult{}, errors.Wrap(err, "Unable to parse IP from response: "+info.podIPAddress+" with err %w")
 		}
 
 		// construct ipnet for result
@@ -196,7 +198,7 @@ func (invoker *CNSIPAMInvoker) Add(addConfig IPAMAddConfig) (IPAMAddResult, erro
 		addResult.hostSubnetPrefix = *hostIPNet
 
 		// set subnet prefix for host vm
-		// setHostOptions will execute if IPAM mode is not v4 overlay
+		// setHostOptions will execute if IPAM mode is not v4 overlay and not dualStackOverlay mode
 		if (invoker.ipamMode != util.V4Overlay) && (invoker.ipamMode != util.DualStackOverlay) {
 			if err := setHostOptions(ncIPNet, addConfig.options, &info); err != nil {
 				return IPAMAddResult{}, err
