@@ -338,3 +338,16 @@ func IsIPV4(ip string) bool {
 
 	return address.Is4()
 }
+
+// Get preferred outbound ip of this machine
+// source: https://stackoverflow.com/questions/23558425/how-do-i-get-the-local-ip-address-in-go
+func NodeIP() (string, error) {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return "", fmt.Errorf("failed to get node IP: %w", err)
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	return localAddr.IP.String(), nil
+}
