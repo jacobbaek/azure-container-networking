@@ -361,7 +361,7 @@ func getSettingsFromACL(policy *NPMNetworkPolicy) ([]*NPMACLPolSettings, error) 
 
 	// fixes #1881
 	hnsRules[len(policy.ACLs)] = &NPMACLPolSettings{
-		Id:        fmt.Sprintf("%s-allow-host-to-endpoint", policy.ACLPolicyID),
+		Id:        policy.ACLPolicyID,
 		Action:    hcn.ActionTypeAllow,
 		Direction: hcn.DirectionTypeIn,
 		Priority:  priority201,
