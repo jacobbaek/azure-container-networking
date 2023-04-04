@@ -15,6 +15,7 @@ import (
 const (
 	// for lints
 	priority200   = 200
+	priority201   = 201
 	priority65499 = 65499
 )
 
@@ -348,7 +349,7 @@ func getEPPolicyReqFromACLSettings(settings []*NPMACLPolSettings) (hcn.PolicyEnd
 }
 
 func getSettingsFromACL(policy *NPMNetworkPolicy) ([]*NPMACLPolSettings, error) {
-	hnsRules := make([]*NPMACLPolSettings, len(policy.ACLs))
+	hnsRules := make([]*NPMACLPolSettings, len(policy.ACLs)+1)
 	for i, acl := range policy.ACLs {
 		rule, err := acl.convertToAclSettings(policy.ACLPolicyID)
 		if err != nil {
@@ -356,6 +357,16 @@ func getSettingsFromACL(policy *NPMNetworkPolicy) ([]*NPMACLPolSettings, error) 
 			return hnsRules, err
 		}
 		hnsRules[i] = rule
+	}
+
+	// fixes #1881
+	hnsRules[len(policy.ACLs)] = &NPMACLPolSettings{
+		Id:        fmt.Sprintf("%s-allow-host-to-endpoint", policy.ACLPolicyID),
+		Action:    hcn.ActionTypeAllow,
+		Direction: hcn.DirectionTypeIn,
+		Priority:  priority201,
+		Protocols: "", // any protocol
+		RuleType:  hcn.RuleTypeSwitch,
 	}
 	return hnsRules, nil
 }
