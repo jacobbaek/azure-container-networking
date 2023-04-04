@@ -354,15 +354,19 @@ func (dp *DataPlane) AddPolicy(policy *policies.NPMNetworkPolicy) error {
 		return fmt.Errorf("[DataPlane] error while adding Rule IPSet references: %w", err)
 	}
 
-	// NOTE: if apply dataplane succeeds, but another area fails, then currently,
-	// netpol controller won't cache the netpol, and the IPSets applied will remain in the kernel since they will have a netpol reference
-	err = dp.applyDataPlaneNow(applyAlways, applyContextNetPol)
-	if err != nil {
-		return fmt.Errorf("[DataPlane] error while applying dataplane: %w", err)
-	}
 	endpointList, err := dp.getEndpointsToApplyPolicy(policy)
 	if err != nil {
-		return err
+		return fmt.Errorf("[DataPlane] error while getting endpoints to apply policy: %w", err)
+	}
+
+	// pMgr.AddPolicy() will not touch the kernel in Windows when there are no endpoints to apply on
+	if !util.IsWindowsDP() || len(endpointList) > 0 {
+		// NOTE: if apply dataplane succeeds, but another area fails, then currently,
+		// netpol controller won't cache the netpol, and the IPSets applied will remain in the kernel since they will have a netpol reference
+		err = dp.applyDataPlaneNow(applyAlways, applyContextNetPol)
+		if err != nil {
+			return fmt.Errorf("[DataPlane] error while applying dataplane: %w", err)
+		}
 	}
 
 	err = dp.policyMgr.AddPolicy(policy, endpointList)
