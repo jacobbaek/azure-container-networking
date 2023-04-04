@@ -14,12 +14,22 @@ import (
 	"k8s.io/klog"
 )
 
-const reconcileTimeInMinutes int = 5
+const (
+	reconcileDuration = time.Duration(5 * time.Minute)
+
+	applyIfNeeded          = true
+	applyAlways            = false
+	applyContextBackground = "APPLY-FROM-BACKGROUND"
+	applyContextApplyDP    = "APPLY-FROM-APPLYDP"
+	applyContextNetPol     = "APPLY-FROM-NETPOL"
+)
 
 type PolicyMode string
 
 // TODO put NodeName in Config?
 type Config struct {
+	ApplyDataPlaneMaxCount int
+	ApplyDataPlaneInterval time.Duration
 	*ipsets.IPSetManagerCfg
 	*policies.PolicyManagerCfg
 }
@@ -42,6 +52,11 @@ func newEndpointCache() *endpointCache {
 	return &endpointCache{cache: make(map[string]*npmEndpoint)}
 }
 
+type applyCounter struct {
+	sync.Mutex
+	count int
+}
+
 type DataPlane struct {
 	*Config
 	policyMgr *policies.PolicyManager
@@ -53,6 +68,7 @@ type DataPlane struct {
 	endpointCache  *endpointCache
 	ioShim         *common.IOShim
 	updatePodCache *updatePodCache
+	applyCounter   *applyCounter
 	stopChannel    <-chan struct{}
 }
 
@@ -70,7 +86,14 @@ func NewDataPlane(nodeName string, ioShim *common.IOShim, cfg *Config, stopChann
 		nodeName:       nodeName,
 		ioShim:         ioShim,
 		updatePodCache: newUpdatePodCache(),
+		applyCounter:   &applyCounter{},
 		stopChannel:    stopChannel,
+	}
+
+	if dp.shouldApplyDataPlaneInBackground() {
+		klog.Infof("[DataPlane] dataplane configured to apply in background every %v or every %d calls to ApplyDataPlane()", dp.ApplyDataPlaneInterval, dp.ApplyDataPlaneMaxCount)
+	} else {
+		klog.Info("[DataPlane] dataplane configured to NOT apply in background")
 	}
 
 	err := dp.BootupDataplane()
@@ -90,7 +113,7 @@ func (dp *DataPlane) BootupDataplane() error {
 // RunPeriodicTasks runs periodic tasks. Should only be called once.
 func (dp *DataPlane) RunPeriodicTasks() {
 	go func() {
-		ticker := time.NewTicker(time.Minute * time.Duration(reconcileTimeInMinutes))
+		ticker := time.NewTicker(reconcileDuration)
 		defer ticker.Stop()
 
 		for {
@@ -107,6 +130,24 @@ func (dp *DataPlane) RunPeriodicTasks() {
 				// in Windows, does nothing
 				// in Linux, locks policy manager but can be interrupted
 				dp.policyMgr.Reconcile()
+			}
+		}
+	}()
+
+	if !dp.shouldApplyDataPlaneInBackground() {
+		return
+	}
+
+	go func() {
+		ticker := time.NewTicker(dp.ApplyDataPlaneInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-dp.stopChannel:
+				return
+			case <-ticker.C:
+				dp.applyDataPlaneNow(applyIfNeeded, applyContextBackground)
 			}
 		}
 	}()
@@ -209,9 +250,46 @@ func (dp *DataPlane) RemoveFromList(listName *ipsets.IPSetMetadata, setNames []*
 // and accordingly makes changes in dataplane. This function helps emulate a single call to
 // dataplane instead of multiple ipset operations calls ipset operations calls to dataplane
 func (dp *DataPlane) ApplyDataPlane() error {
+	if !dp.shouldApplyDataPlaneInBackground() {
+		return dp.applyDataPlaneNow(applyAlways, applyContextApplyDP)
+	}
+
+	dp.applyCounter.Lock()
+	dp.applyCounter.count++
+	newCount := dp.applyCounter.count
+	atMaximum := dp.applyCounter.count >= dp.ApplyDataPlaneMaxCount
+	dp.applyCounter.Unlock()
+
+	klog.Infof("[DataPlane] [ApplyDataPlane] new apply count: %d", newCount)
+	if atMaximum {
+		klog.Infof("[DataPlane] [ApplyDataPlane] applying now since max count reached")
+		return dp.applyDataPlaneNow(applyIfNeeded, applyContextApplyDP)
+	}
+	return nil
+}
+
+func (dp *DataPlane) applyDataPlaneNow(checkApplyCount bool, context string) error {
+	if dp.shouldApplyDataPlaneInBackground() {
+		dp.applyCounter.Lock()
+		currentCount := dp.applyCounter.count
+		dp.applyCounter.Unlock()
+
+		if checkApplyCount && currentCount == 0 {
+			return nil
+		}
+	}
+
+	klog.Infof("[DataPlane] [ApplyDataPlane] [%s] starting to apply ipsets", context)
 	err := dp.ipsetMgr.ApplyIPSets()
 	if err != nil {
 		return fmt.Errorf("[DataPlane] error while applying IPSets: %w", err)
+	}
+	klog.Infof("[DataPlane] [ApplyDataPlane] [%s] finished applying ipsets", context)
+
+	if dp.shouldApplyDataPlaneInBackground() {
+		dp.applyCounter.Lock()
+		dp.applyCounter.count = 0
+		dp.applyCounter.Unlock()
 	}
 
 	// NOTE: ideally we won't refresh Pod Endpoints if the updatePodCache is empty
@@ -224,6 +302,8 @@ func (dp *DataPlane) ApplyDataPlane() error {
 		}
 		dp.updatePodCache.Unlock()
 
+		klog.Infof("[DataPlane] [ApplyDataPlane] [%s] refreshing endpoints before updating pods", context)
+
 		err := dp.refreshPodEndpoints()
 		if err != nil {
 			metrics.SendErrorLogAndMetric(util.DaemonDataplaneID, "[DataPlane] failed to refresh endpoints while updating pods. err: [%s]", err.Error())
@@ -231,10 +311,14 @@ func (dp *DataPlane) ApplyDataPlane() error {
 			return nil
 		}
 
+		klog.Infof("[DataPlane] [ApplyDataPlane] [%s] refreshed endpoints", context)
+
 		// lock updatePodCache while driving goal state to kernel
 		// prevents another ApplyDataplane call from updating the same pods
 		dp.updatePodCache.Lock()
 		defer dp.updatePodCache.Unlock()
+
+		klog.Infof("[DataPlane] [ApplyDataPlane] [%s] starting to update pods", context)
 
 		for podKey, pod := range dp.updatePodCache.cache {
 			err := dp.updatePod(pod)
@@ -246,6 +330,8 @@ func (dp *DataPlane) ApplyDataPlane() error {
 
 			delete(dp.updatePodCache.cache, podKey)
 		}
+
+		klog.Infof("[DataPlane] [ApplyDataPlane] [%s] finished updating pods", context)
 	}
 	return nil
 }
@@ -268,15 +354,19 @@ func (dp *DataPlane) AddPolicy(policy *policies.NPMNetworkPolicy) error {
 		return fmt.Errorf("[DataPlane] error while adding Rule IPSet references: %w", err)
 	}
 
-	// NOTE: if apply dataplane succeeds, but another area fails, then currently,
-	// netpol controller won't cache the netpol, and the IPSets applied will remain in the kernel since they will have a netpol reference
-	err = dp.ApplyDataPlane()
-	if err != nil {
-		return fmt.Errorf("[DataPlane] error while applying dataplane: %w", err)
-	}
 	endpointList, err := dp.getEndpointsToApplyPolicy(policy)
 	if err != nil {
-		return err
+		return fmt.Errorf("[DataPlane] error while getting endpoints to apply policy: %w", err)
+	}
+
+	// pMgr.AddPolicy() will not touch the kernel in Windows when there are no endpoints to apply on
+	if !util.IsWindowsDP() || len(endpointList) > 0 {
+		// NOTE: if apply dataplane succeeds, but another area fails, then currently,
+		// netpol controller won't cache the netpol, and the IPSets applied will remain in the kernel since they will have a netpol reference
+		err = dp.applyDataPlaneNow(applyAlways, applyContextNetPol)
+		if err != nil {
+			return fmt.Errorf("[DataPlane] error while applying dataplane: %w", err)
+		}
 	}
 
 	err = dp.policyMgr.AddPolicy(policy, endpointList)
@@ -339,7 +429,7 @@ func (dp *DataPlane) RemovePolicy(policyKey string) error {
 		return err
 	}
 
-	err = dp.ApplyDataPlane()
+	err = dp.applyDataPlaneNow(applyAlways, applyContextNetPol)
 	if err != nil {
 		return fmt.Errorf("[DataPlane] error while applying dataplane: %w", err)
 	}
@@ -463,4 +553,8 @@ func (dp *DataPlane) deleteIPSetsAndReferences(sets []*ipsets.TranslatedIPSet, n
 		dp.ipsetMgr.DeleteIPSet(set.Metadata.GetPrefixName(), false)
 	}
 	return nil
+}
+
+func (dp *DataPlane) shouldApplyDataPlaneInBackground() bool {
+	return util.IsWindowsDP() && dp.ApplyDataPlaneMaxCount > 0 && dp.ApplyDataPlaneInterval > 0
 }
