@@ -29,6 +29,8 @@ const (
 )
 
 type PolicyManagerCfg struct {
+	// NodeIP is only used in Windows
+	NodeIP string
 	// PolicyMode only affects Windows
 	PolicyMode PolicyManagerMode
 	// PlaceAzureChainFirst only affects Linux
@@ -56,8 +58,6 @@ type PolicyManager struct {
 	ioShim           *common.IOShim
 	staleChains      *staleChains
 	reconcileManager *reconcileManager
-	// nodeIP is only used in Windows
-	nodeIP string
 	*PolicyManagerCfg
 }
 
@@ -90,17 +90,13 @@ func (pMgr *PolicyManager) Bootup(epIDs []string) error {
 		return npmerrors.ErrorWrapper(npmerrors.BootupPolicyMgr, false, "failed to bootup policy manager", err)
 	}
 
-	if util.IsWindowsDP() {
-		nodeIP, err := util.NodeIP()
-		if err != nil {
-			return fmt.Errorf("failed to get node IP while booting up: %w", err)
-		}
-
-		pMgr.nodeIP = nodeIP
-		klog.Infof("[DataPlane] node IP is %s", pMgr.nodeIP)
-	} else {
+	if !util.IsWindowsDP() {
 		// update Prometheus metrics on success
 		metrics.IncNumACLRulesBy(numLinuxBaseACLRules)
+	}
+
+	if util.IsWindowsDP() && pMgr.NodeIP == "" {
+		return npmerrors.Errorf(npmerrors.BootupPolicyMgr, false, "policy manager must have a configured nodeIP in Windows")
 	}
 
 	return nil

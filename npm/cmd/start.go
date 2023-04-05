@@ -136,6 +136,13 @@ func start(config npmconfig.Config, flags npmconfig.Flags) error {
 			npmV2DataplaneCfg.IPSetMode = ipsets.ApplyAllIPSets
 		}
 
+		nodeIP, err := util.NodeIP()
+		if err != nil {
+			return fmt.Errorf("failed to get node IP while booting up: %w", err)
+		}
+
+		npmV2DataplaneCfg.NodeIP = nodeIP
+
 		dp, err = dataplane.NewDataPlane(models.GetNodeName(), common.NewIOShim(), npmV2DataplaneCfg, stopChannel)
 		if err != nil {
 			return fmt.Errorf("failed to create dataplane with error %w", err)

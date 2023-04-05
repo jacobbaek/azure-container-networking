@@ -365,7 +365,7 @@ func (pMgr *PolicyManager) getSettingsFromACL(policy *NPMNetworkPolicy) ([]*NPMA
 		Id:              policy.ACLPolicyID,
 		Action:          hcn.ActionTypeAllow,
 		Direction:       hcn.DirectionTypeIn,
-		RemoteAddresses: pMgr.nodeIP,
+		RemoteAddresses: pMgr.NodeIP,
 		Protocols:       "", // any protocol
 		Priority:        priority201,
 		RuleType:        hcn.RuleTypeSwitch,

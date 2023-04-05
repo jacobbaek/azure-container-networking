@@ -14,6 +14,7 @@ import (
 
 var (
 	ipsetConfig = &PolicyManagerCfg{
+		NodeIP:               "6.7.8.9",
 		PolicyMode:           IPSetPolicyMode,
 		PlaceAzureChainFirst: util.PlaceAzureChainFirst,
 	}
