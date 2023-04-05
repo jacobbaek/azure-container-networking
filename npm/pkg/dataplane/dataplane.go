@@ -263,14 +263,13 @@ func (dp *DataPlane) RemoveFromList(listName *ipsets.IPSetMetadata, setNames []*
 // and accordingly makes changes in dataplane. This function helps emulate a single call to
 // dataplane instead of multiple ipset operations calls ipset operations calls to dataplane
 func (dp *DataPlane) ApplyDataPlane() error {
-	if !dp.configuredToApplyInBackground() {
-		return dp.applyDataPlaneNow(contextApplyDP)
+	if dp.configuredToApplyInBackground() {
+		return dp.incrementBatchAndApplyIfNeeded(contextApplyDP)
 	}
 
-	return dp.incrementBatchAndApplyIfNeeded(contextApplyDP)
+	return dp.applyDataPlaneNow(contextApplyDP)
 }
 
-// increment the batch count and applies the data plane if the max batch count is reached
 func (dp *DataPlane) incrementBatchAndApplyIfNeeded(context string) error {
 	dp.batchCounter.Lock()
 	dp.batchCounter.count++
