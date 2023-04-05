@@ -252,6 +252,8 @@ func (dp *DataPlane) updatePod(pod *updateNPMPod) error {
 		endpoint.netPolReference[policyKey] = struct{}{}
 	}
 
+	klog.Infof("[DataPlane] updatedPod complete. podKey: %s. endpoint: %+v", pod.PodKey, endpoint)
+
 	return nil
 }
 

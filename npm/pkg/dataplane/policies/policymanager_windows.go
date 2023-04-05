@@ -169,17 +169,20 @@ func (pMgr *PolicyManager) AddAllPolicies(policyKeys map[string]struct{}, epToMo
 		allRulesToAdd = append(allRulesToAdd, rulesToAdd...)
 	}
 
+	klog.Infof("[PolicyManager] allRulesToAdd: %+v")
 	epPolicyRequest, err := getEPPolicyReqFromACLSettings(allRulesToAdd)
 	if err != nil {
 		return fmt.Errorf("error while applying all policies. endpoint IP: %s. endpoint ID: %s. policyKeys: %+v. err: %w", epToModifyIP, epToModifyID, policyKeys, err)
 	}
 
+	klog.Infof("[PolicyManager] applying all rules to endpoint. endpoint ID: %s. policyKeys: %+v", epToModifyID, policyKeys)
 	err = pMgr.applyPoliciesToEndpointID(epToModifyID, epPolicyRequest)
 	if err != nil {
 		klog.Errorf("failed to add all policies on endpoint. endpoint ID: %s. policyKeys: %+v. err: %s", epToModifyID, policyKeys, err.Error())
 		return fmt.Errorf("failed to add all policies on endpoint. endpoint ID: %s. policyKeys: %+v. err: %w", epToModifyID, policyKeys, err)
 	}
 
+	klog.Infof("[PolicyManager] finished applying all rules to endpoint. endpoint ID: %s. policyKeys: %+v", epToModifyID, policyKeys)
 	for policyKey := range policyKeys {
 		policy, ok := pMgr.GetPolicy(policyKey)
 		if ok {
