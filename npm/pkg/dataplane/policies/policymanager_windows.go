@@ -184,7 +184,7 @@ func (pMgr *PolicyManager) AddAllPolicies(policyKeys map[string]struct{}, epToMo
 
 	klog.Infof("[PolicyManager] finished applying all rules to endpoint. endpoint ID: %s. policyKeys: %+v", epToModifyID, policyKeys)
 	for policyKey := range policyKeys {
-		policy, ok := pMgr.GetPolicy(policyKey)
+		policy, ok := pMgr.policyMap.cache[policyKey]
 		if ok {
 			policy.PodEndpoints[epToModifyIP] = epToModifyID
 		} else {
