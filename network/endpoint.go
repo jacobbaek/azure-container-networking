@@ -114,7 +114,8 @@ func (nw *network) newEndpoint(
 	nl netlink.NetlinkInterface,
 	plc platform.ExecClient,
 	netioCli netio.NetIOInterface,
-	epInfo *EndpointInfo) (*endpoint, error) {
+	epInfo *EndpointInfo,
+) (*endpoint, error) {
 	var ep *endpoint
 	var err error
 

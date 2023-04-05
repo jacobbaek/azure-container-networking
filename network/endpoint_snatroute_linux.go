@@ -60,7 +60,7 @@ func MoveSnatEndpointToContainerNS(snatClient *snat.Client, netnsPath string, ns
 		if delErr := snatClient.DeleteSnatEndpoint(); delErr != nil {
 			log.Errorf("failed to delete snat endpoint on error(moving to container ns): %v", delErr)
 		}
-		return errors.Wrap(err, "failed to move snat endpoint to container ns. Deleted snat endpoint.")
+		return errors.Wrap(err, "failed to move snat endpoint to container ns. deleted snat endpoint")
 	}
 	return nil
 }

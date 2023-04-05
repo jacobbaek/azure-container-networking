@@ -203,11 +203,11 @@ var _ = Describe("Test Endpoint", func() {
 				Expect(ep.VlanID).To(Equal(epInfo.Data[VlanIDKey].(int)))
 			})
 			It("Should be not added", func() {
-				//Adding an endpoint with an id.
+				// Adding an endpoint with an id.
 				mockCli := NewMockEndpointClient(false)
 				err := mockCli.AddEndpoints(epInfo)
 				Expect(err).ToNot(HaveOccurred())
-				//Adding endpoint with same id should fail and delete should cleanup the state
+				// Adding endpoint with same id should fail and delete should cleanup the state
 				ep2, err := nw.newEndpointImpl(nil, netlink.NewMockNetlink(false, ""), platform.NewMockExecClient(false),
 					netio.NewMockNetIO(false, 0), mockCli, epInfo)
 				Expect(err).To(HaveOccurred())
@@ -216,7 +216,7 @@ var _ = Describe("Test Endpoint", func() {
 				Expect(len(mockCli.endpoints)).To(Equal(0))
 			})
 			It("Should be deleted", func() {
-				//Adding an endpoint with an id.
+				// Adding an endpoint with an id.
 				mockCli := NewMockEndpointClient(false)
 				ep2, err := nw.newEndpointImpl(nil, netlink.NewMockNetlink(false, ""), platform.NewMockExecClient(false),
 					netio.NewMockNetIO(false, 0), mockCli, epInfo)
@@ -224,9 +224,11 @@ var _ = Describe("Test Endpoint", func() {
 				Expect(ep2).ToNot(BeNil())
 				Expect(len(mockCli.endpoints)).To(Equal(1))
 				// Deleting the endpoint
+				//nolint:errcheck // ignore error
 				nw.deleteEndpointImpl(netlink.NewMockNetlink(false, ""), platform.NewMockExecClient(false), mockCli, ep2)
 				Expect(len(mockCli.endpoints)).To(Equal(0))
-				//Deleting same endpoint with same id should not fail
+				// Deleting same endpoint with same id should not fail
+				//nolint:errcheck // ignore error
 				nw.deleteEndpointImpl(netlink.NewMockNetlink(false, ""), platform.NewMockExecClient(false), mockCli, ep2)
 				Expect(len(mockCli.endpoints)).To(Equal(0))
 			})

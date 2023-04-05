@@ -54,7 +54,8 @@ func (nw *network) newEndpointImpl(
 	plc platform.ExecClient,
 	netioCli netio.NetIOInterface,
 	epClient EndpointClient,
-	epInfo *EndpointInfo) (*endpoint, error) {
+	epInfo *EndpointInfo,
+) (*endpoint, error) {
 	var containerIf *net.Interface
 	var ns *Namespace
 	var ep *endpoint
@@ -95,6 +96,7 @@ func (nw *network) newEndpointImpl(
 
 	// epClient is non-nil only when the endpoint is created for the unit test.
 	if epClient == nil {
+		//nolint:gocritic
 		if vlanid != 0 {
 			if nw.Mode == opModeTransparentVlan {
 				log.Printf("Transparent vlan client")
@@ -155,6 +157,7 @@ func (nw *network) newEndpointImpl(
 				endpt.Gateways = []net.IP{nw.extIf.IPv4Gateway}
 			}
 			// set deleteHostVeth to true to cleanup host veth interface if created
+			//nolint:errcheck // ignore error
 			epClient.DeleteEndpoints(endpt, true)
 		}
 	}()
@@ -258,8 +261,9 @@ func (nw *network) deleteEndpointImpl(nl netlink.NetlinkInterface, plc platform.
 	// Deleting the host interface is more convenient since it does not require
 	// entering the container netns and hence works both for CNI and CNM.
 
-	//epClient is nil only for unit test.
+	// epClient is nil only for unit test.
 	if epClient == nil {
+		//nolint:gocritic
 		if ep.VlanID != 0 {
 			epInfo := ep.getInfo()
 			if nw.Mode == opModeTransparentVlan {
@@ -279,6 +283,7 @@ func (nw *network) deleteEndpointImpl(nl netlink.NetlinkInterface, plc platform.
 	epClient.DeleteEndpointRules(ep)
 	// deleteHostVeth set to false not to delete veth as CRI will remove network namespace and
 	// veth will get removed as part of that.
+	//nolint:errcheck // ignore error
 	epClient.DeleteEndpoints(ep, false)
 
 	return nil

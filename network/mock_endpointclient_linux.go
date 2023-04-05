@@ -26,7 +26,7 @@ func NewMockEndpointClient(returnError bool) *MockEndpointClient {
 }
 
 func (client *MockEndpointClient) AddEndpoints(epInfo *EndpointInfo) error {
-	if ok, _ := client.endpoints[epInfo.Id]; ok {
+	if ok := client.endpoints[epInfo.Id]; ok {
 		return newErrorMockEndpointClient("Endpoint already exists")
 	}
 
@@ -39,31 +39,22 @@ func (client *MockEndpointClient) AddEndpoints(epInfo *EndpointInfo) error {
 	return nil
 }
 
-func (client *MockEndpointClient) AddEndpointRules(epInfo *EndpointInfo) error {
+func (client *MockEndpointClient) AddEndpointRules(_ *EndpointInfo) error {
 	return nil
 }
 
-func (client *MockEndpointClient) DeleteEndpointRules(ep *endpoint) {
-
+func (client *MockEndpointClient) DeleteEndpointRules(_ *endpoint) {
 }
 
-func (client *MockEndpointClient) MoveEndpointsToContainerNS(epInfo *EndpointInfo, nsID uintptr) error {
+func (client *MockEndpointClient) MoveEndpointsToContainerNS(_ *EndpointInfo, _ uintptr) error {
 	return nil
 }
 
-func (client *MockEndpointClient) SetupContainerInterfaces(epInfo *EndpointInfo) error {
+func (client *MockEndpointClient) SetupContainerInterfaces(_ *EndpointInfo) error {
 	return nil
 }
 
-func (client *MockEndpointClient) ConfigureContainerInterfacesAndRoutes(epInfo *EndpointInfo) error {
-	return nil
-}
-
-func (client *MockEndpointClient) setupIPV6Routes() error {
-	return nil
-}
-
-func (client *MockEndpointClient) setIPV6NeighEntry() error {
+func (client *MockEndpointClient) ConfigureContainerInterfacesAndRoutes(_ *EndpointInfo) error {
 	return nil
 }
 
