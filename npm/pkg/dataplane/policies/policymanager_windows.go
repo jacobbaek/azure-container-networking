@@ -124,6 +124,74 @@ func (pMgr *PolicyManager) reconcile() {
 	// not implemented
 }
 
+func (pMgr *PolicyManager) AddAllPolicies(policyKeys map[string]struct{}, epToModifyID, epToModifyIP string) error {
+	pMgr.policyMap.Lock()
+	defer pMgr.policyMap.Unlock()
+
+	klog.Infof("[PolicyManagerWindows] adding all policies. epID: %s. epIP: %s. policyKeys: %+v", epToModifyID, epToModifyIP, policyKeys)
+
+	allRulesToAdd := make([]*NPMACLPolSettings, 0)
+
+	for policyKey := range policyKeys {
+		policy, ok := pMgr.GetPolicy(policyKey)
+		if !ok {
+			klog.Infof("[PolicyManagerWindows] policy not found while adding all policies. policyKey: %s. epID: %s", policyKey, epToModifyID)
+			delete(policyKeys, policyKey)
+			continue
+		}
+
+		// 1. remove stale endpoints from policy.PodEndpoints and skip adding to endpoints that already have the policy
+		if policy.PodEndpoints == nil {
+			policy.PodEndpoints = make(map[string]string)
+		}
+
+		epID, ok := policy.PodEndpoints[epToModifyIP]
+		if ok {
+			if epID == epToModifyID {
+				klog.Infof("[PolicyManagerWindows] while adding all policies, will not add policy %s to endpoint since it already exists there. endpoint IP: %s, endpoint ID: %s", policy.PolicyKey, epToModifyIP, epToModifyID)
+				delete(policyKeys, policyKey)
+				continue
+			}
+
+			// If the expected ID is not same as epID, there is a chance that old pod got deleted
+			// and same IP is used by new pod with new endpoint.
+			// so we should delete the non-existent endpoint from policy reference
+			klog.Infof("[PolicyManagerWindows] while adding all policies, removing endpoint from policy's current endpoints since the endpoint ID has changed. policy: %s, endpoint IP: %s, new ID: %s, previous ID: %s", policy.PolicyKey, epToModifyIP, epToModifyID, epID)
+			delete(policy.PodEndpoints, epToModifyIP)
+		}
+
+		// 2. apply the policy to all the endpoints via HNS
+		rulesToAdd, err := getSettingsFromACL(policy)
+		if err != nil {
+			return fmt.Errorf("error while getting settings while applying all policies. policy: %s, endpoint IP: %s, endpoint ID: %s, err: %w", policy.PolicyKey, epToModifyIP, epToModifyID, err)
+		}
+
+		allRulesToAdd = append(allRulesToAdd, rulesToAdd...)
+	}
+
+	epPolicyRequest, err := getEPPolicyReqFromACLSettings(allRulesToAdd)
+	if err != nil {
+		return fmt.Errorf("error while applying all policies. endpoint IP: %s. endpoint ID: %s. policyKeys: %+v. err: %w", epToModifyIP, epToModifyID, policyKeys, err)
+	}
+
+	err = pMgr.applyPoliciesToEndpointID(epToModifyID, epPolicyRequest)
+	if err != nil {
+		klog.Errorf("failed to add all policies on endpoint. endpoint ID: %s. policyKeys: %+v. err: %s", epToModifyID, policyKeys, err.Error())
+		return fmt.Errorf("failed to add all policies on endpoint. endpoint ID: %s. policyKeys: %+v. err: %w", epToModifyID, policyKeys, err)
+	}
+
+	for policyKey := range policyKeys {
+		policy, ok := pMgr.GetPolicy(policyKey)
+		if ok {
+			policy.PodEndpoints[epToModifyIP] = epToModifyID
+		} else {
+			klog.Infof("[PolicyManagerWindows] unexpected error: policy not found after adding all policies. policyKey: %s. epID: %s", policyKey, epToModifyID)
+		}
+	}
+
+	return nil
+}
+
 // AddBaseACLsForCalicoCNI attempts to add base ACLs for Calico CNI.
 func (pMgr *PolicyManager) AddBaseACLsForCalicoCNI(epID string) {
 	epPolicyRequest, err := getEPPolicyReqFromACLSettings(baseACLsForCalicoCNI)
