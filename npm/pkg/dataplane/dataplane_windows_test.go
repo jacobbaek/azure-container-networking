@@ -40,10 +40,17 @@ func testSerialCases(t *testing.T, tests []*SerialTestCase) {
 		i := i
 		tt := tt
 
+		haveSkipTestTag := false
 		for _, tag := range tt.Tags {
 			if tag == skipTestTag {
-				continue
+				haveSkipTestTag = true
+				break
 			}
+		}
+
+		if haveSkipTestTag {
+			t.Logf("skipping test #%d. Description: [%s]. Tags: %+v", i, tt.Description, tt.Tags)
+			continue
 		}
 
 		t.Run(tt.Description, func(t *testing.T) {
