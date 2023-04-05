@@ -123,11 +123,11 @@ func start(config npmconfig.Config, flags npmconfig.Flags) error {
 	stopChannel := wait.NeverStop
 	if config.Toggles.EnableV2NPM {
 		// update the dataplane config
-		npmV2DataplaneCfg.ApplyDataPlaneMaxCount = config.ApplyDataPlaneMaxCount
+		npmV2DataplaneCfg.ApplyDataPlaneMaxBatches = config.ApplyDataPlaneMaxBatches
 		npmV2DataplaneCfg.ApplyDataPlaneInterval = time.Duration(config.ApplyDataPlaneIntervalInMilliseconds * int(time.Millisecond))
 
 		// FIXME remove this code which overrides Apply config
-		npmV2DataplaneCfg.ApplyDataPlaneMaxCount = 100
+		npmV2DataplaneCfg.ApplyDataPlaneMaxBatches = 100
 		npmV2DataplaneCfg.ApplyDataPlaneInterval = 500 * time.Millisecond
 
 		if config.WindowsNetworkName == "" {

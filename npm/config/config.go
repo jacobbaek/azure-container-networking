@@ -17,7 +17,7 @@ const (
 // DefaultConfig is the guaranteed configuration NPM can run in out of the box
 var DefaultConfig = Config{
 	WindowsNetworkName:                   util.AzureNetworkName,
-	ApplyDataPlaneMaxCount:               0,
+	ApplyDataPlaneMaxBatches:             0,
 	ApplyDataPlaneIntervalInMilliseconds: 0,
 	ResyncPeriodInMinutes:                defaultResyncPeriod,
 
@@ -53,7 +53,7 @@ type Config struct {
 	// WindowsNetworkName can be either 'azure' or 'Calico' (case sensitive).
 	// It can also be the empty string, which results in the default value of 'azure'.
 	WindowsNetworkName                   string           `json:"WindowsNetworkName,omitempty"`
-	ApplyDataPlaneMaxCount               int              `json:"ApplyDataPlaneMaxCount,omitempty"`
+	ApplyDataPlaneMaxBatches             int              `json:"ApplyDataPlaneMaxBatches,omitempty"`
 	ApplyDataPlaneIntervalInMilliseconds int              `json:"ApplyDataPlaneMaxWaitInMilliseconds,omitempty"`
 	ResyncPeriodInMinutes                int              `json:"ResyncPeriodInMinutes,omitempty"`
 	ListeningPort                        int              `json:"ListeningPort,omitempty"`
