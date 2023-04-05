@@ -154,7 +154,7 @@ func (nw *network) newEndpointImpl(
 			if nw.extIf != nil {
 				endpt.Gateways = []net.IP{nw.extIf.IPv4Gateway}
 			}
-			// set deleteHostVeth to true to cleanup host veth interface if created 
+			// set deleteHostVeth to true to cleanup host veth interface if created
 			epClient.DeleteEndpoints(endpt, true)
 		}
 	}()
@@ -276,9 +276,9 @@ func (nw *network) deleteEndpointImpl(nl netlink.NetlinkInterface, plc platform.
 		}
 	}
 
-	epClient.DeleteEndpointRules(ep)y
-    // deleteHostVeth set to false not to delete veth as CRI will remove network namespace and
-    // veth will get removed as part of that.
+	epClient.DeleteEndpointRules(ep)
+	// deleteHostVeth set to false not to delete veth as CRI will remove network namespace and
+	// veth will get removed as part of that.
 	epClient.DeleteEndpoints(ep, false)
 
 	return nil
