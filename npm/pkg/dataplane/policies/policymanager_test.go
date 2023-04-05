@@ -133,6 +133,7 @@ func TestAddPolicy(t *testing.T) {
 	numTestNetPolACLRulesProducedInKernel := 3
 	if util.IsWindowsDP() {
 		numEndpoints := 2
+		numTestNetPolACLRulesProducedInKernel += 1
 		numTestNetPolACLRulesProducedInKernel *= numEndpoints
 	}
 	promVals{numTestNetPolACLRulesProducedInKernel, 1}.testPrometheusMetrics(t)
