@@ -133,7 +133,7 @@ func (pMgr *PolicyManager) AddAllPolicies(policyKeys map[string]struct{}, epToMo
 	allRulesToAdd := make([]*NPMACLPolSettings, 0)
 
 	for policyKey := range policyKeys {
-		policy, ok := pMgr.GetPolicy(policyKey)
+		policy, ok := pMgr.policyMap.cache[policyKey]
 		if !ok {
 			klog.Infof("[PolicyManagerWindows] policy not found while adding all policies. policyKey: %s. epID: %s", policyKey, epToModifyID)
 			delete(policyKeys, policyKey)
