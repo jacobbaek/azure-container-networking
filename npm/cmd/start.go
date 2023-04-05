@@ -136,7 +136,8 @@ func start(config npmconfig.Config, flags npmconfig.Flags) error {
 			npmV2DataplaneCfg.IPSetMode = ipsets.ApplyAllIPSets
 		}
 
-		nodeIP, err := util.NodeIP()
+		var nodeIP string
+		nodeIP, err = util.NodeIP()
 		if err != nil {
 			return fmt.Errorf("failed to get node IP while booting up: %w", err)
 		}

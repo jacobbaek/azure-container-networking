@@ -60,6 +60,7 @@ var (
 			RemotePorts:     "",
 			Priority:        allowRulePriotity,
 		},
+		// readiness probe ACL
 		{
 			ID:              TestNetworkPolicies[0].ACLPolicyID,
 			Direction:       "In",

@@ -349,6 +349,7 @@ func getEPPolicyReqFromACLSettings(settings []*NPMACLPolSettings) (hcn.PolicyEnd
 }
 
 func (pMgr *PolicyManager) getSettingsFromACL(policy *NPMNetworkPolicy) ([]*NPMACLPolSettings, error) {
+	// +1 for readiness probe ACL
 	hnsRules := make([]*NPMACLPolSettings, len(policy.ACLs)+1)
 	for i, acl := range policy.ACLs {
 		rule, err := acl.convertToAclSettings(policy.ACLPolicyID)
@@ -360,7 +361,7 @@ func (pMgr *PolicyManager) getSettingsFromACL(policy *NPMNetworkPolicy) ([]*NPMA
 	}
 
 	// fixes #1881
-	// allows ingress from host to pod
+	// readiness probe ACL. allows ingress from host to pod
 	hnsRules[len(policy.ACLs)] = &NPMACLPolSettings{
 		Id:              policy.ACLPolicyID,
 		Action:          hcn.ActionTypeAllow,
