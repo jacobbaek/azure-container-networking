@@ -123,12 +123,18 @@ func start(config npmconfig.Config, flags npmconfig.Flags) error {
 	stopChannel := wait.NeverStop
 	if config.Toggles.EnableV2NPM {
 		// update the dataplane config
-		npmV2DataplaneCfg.ApplyDataPlaneMaxBatches = config.ApplyDataPlaneMaxBatches
-		npmV2DataplaneCfg.ApplyDataPlaneInterval = time.Duration(config.ApplyDataPlaneIntervalInMilliseconds * int(time.Millisecond))
-
-		// FIXME remove this code which overrides Apply config
-		npmV2DataplaneCfg.ApplyDataPlaneMaxBatches = 100
-		npmV2DataplaneCfg.ApplyDataPlaneInterval = 500 * time.Millisecond
+		// FIXME remove override
+		npmV2DataplaneCfg.ApplyInBackground = true // config.ApplyInBackground
+		if config.ApplyMaxBatches > 0 {
+			npmV2DataplaneCfg.ApplyMaxBatches = config.ApplyMaxBatches
+		} else {
+			npmV2DataplaneCfg.ApplyMaxBatches = npmconfig.DefaultConfig.ApplyMaxBatches
+		}
+		if config.ApplyIntervalInMilliseconds > 0 {
+			npmV2DataplaneCfg.ApplyInterval = time.Duration(config.ApplyIntervalInMilliseconds * int(time.Millisecond))
+		} else {
+			npmV2DataplaneCfg.ApplyInterval = time.Duration(npmconfig.DefaultConfig.ApplyIntervalInMilliseconds * int(time.Millisecond))
+		}
 
 		if config.WindowsNetworkName == "" {
 			npmV2DataplaneCfg.NetworkName = util.AzureNetworkName

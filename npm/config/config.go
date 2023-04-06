@@ -16,10 +16,11 @@ const (
 
 // DefaultConfig is the guaranteed configuration NPM can run in out of the box
 var DefaultConfig = Config{
-	WindowsNetworkName:                   util.AzureNetworkName,
-	ApplyDataPlaneMaxBatches:             0,
-	ApplyDataPlaneIntervalInMilliseconds: 0,
-	ResyncPeriodInMinutes:                defaultResyncPeriod,
+	WindowsNetworkName:          util.AzureNetworkName,
+	ApplyInBackground:           false,
+	ApplyMaxBatches:             100,
+	ApplyIntervalInMilliseconds: 500,
+	ResyncPeriodInMinutes:       defaultResyncPeriod,
 
 	ListeningPort:    defaultListeningPort,
 	ListeningAddress: "0.0.0.0",
@@ -52,14 +53,18 @@ type GrpcServerConfig struct {
 type Config struct {
 	// WindowsNetworkName can be either 'azure' or 'Calico' (case sensitive).
 	// It can also be the empty string, which results in the default value of 'azure'.
-	WindowsNetworkName                   string           `json:"WindowsNetworkName,omitempty"`
-	ApplyDataPlaneMaxBatches             int              `json:"ApplyDataPlaneMaxBatches,omitempty"`
-	ApplyDataPlaneIntervalInMilliseconds int              `json:"ApplyDataPlaneMaxWaitInMilliseconds,omitempty"`
-	ResyncPeriodInMinutes                int              `json:"ResyncPeriodInMinutes,omitempty"`
-	ListeningPort                        int              `json:"ListeningPort,omitempty"`
-	ListeningAddress                     string           `json:"ListeningAddress,omitempty"`
-	Transport                            GrpcServerConfig `json:"Transport,omitempty"`
-	Toggles                              Toggles          `json:"Toggles,omitempty"`
+	WindowsNetworkName string `json:"WindowsNetworkName,omitempty"`
+
+	// Apply options for Windows only
+	ApplyInBackground           bool `json:"ApplyInBackground,omitempty"`
+	ApplyMaxBatches             int  `json:"ApplyDataPlaneMaxBatches,omitempty"`
+	ApplyIntervalInMilliseconds int  `json:"ApplyDataPlaneMaxWaitInMilliseconds,omitempty"`
+
+	ResyncPeriodInMinutes int              `json:"ResyncPeriodInMinutes,omitempty"`
+	ListeningPort         int              `json:"ListeningPort,omitempty"`
+	ListeningAddress      string           `json:"ListeningAddress,omitempty"`
+	Transport             GrpcServerConfig `json:"Transport,omitempty"`
+	Toggles               Toggles          `json:"Toggles,omitempty"`
 }
 
 type Toggles struct {

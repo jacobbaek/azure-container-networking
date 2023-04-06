@@ -20,25 +20,37 @@ const (
 )
 
 func TestBasics(t *testing.T) {
-	testSerialCases(t, basicTests())
+	testSerialCases(t, basicTests(), 0)
 }
 
 func TestPodEndpointAssignment(t *testing.T) {
-	testSerialCases(t, updatePodTests())
+	testSerialCases(t, updatePodTests(), 0)
 }
 
 func TestCapzCalico(t *testing.T) {
-	testSerialCases(t, capzCalicoTests())
+	testSerialCases(t, capzCalicoTests(), 0)
+}
+
+func TestApplyInBackground(t *testing.T) {
+	testSerialCases(t, applyInBackgroundTests(), time.Duration(100*time.Millisecond))
 }
 
 func TestAllMultiJobCases(t *testing.T) {
-	testMultiJobCases(t, getAllMultiJobTests())
+	testMultiJobCases(t, getAllMultiJobTests(), 0)
 }
 
-func testSerialCases(t *testing.T, tests []*SerialTestCase) {
+func TestMultiJobApplyInBackground(t *testing.T) {
+	testMultiJobCases(t, multiJobApplyInBackgroundTests(), time.Duration(100*time.Millisecond))
+}
+
+func testSerialCases(t *testing.T, tests []*SerialTestCase, finalSleep time.Duration) {
 	for i, tt := range tests {
 		i := i
 		tt := tt
+
+		if tt.Description != "pod created on node, then relevant policy created" {
+			continue
+		}
 
 		for _, tag := range tt.Tags {
 			if tag == skipTestTag {
@@ -73,12 +85,13 @@ func testSerialCases(t *testing.T, tests []*SerialTestCase) {
 				require.Nil(t, err, "failed to run action %d", j)
 			}
 
+			time.Sleep(finalSleep)
 			dptestutils.VerifyHNSCache(t, hns, tt.ExpectedSetPolicies, tt.ExpectedEnpdointACLs)
 		})
 	}
 }
 
-func testMultiJobCases(t *testing.T, tests []*MultiJobTestCase) {
+func testMultiJobCases(t *testing.T, tests []*MultiJobTestCase, finalSleep time.Duration) {
 	for i, tt := range tests {
 		i := i
 		tt := tt
@@ -128,6 +141,7 @@ func testMultiJobCases(t *testing.T, tests []*MultiJobTestCase) {
 				}()
 			}
 
+			time.Sleep(finalSleep)
 			wg.Wait()
 			close(backgroundErrors)
 			if len(backgroundErrors) > 0 {

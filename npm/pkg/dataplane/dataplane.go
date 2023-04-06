@@ -1,6 +1,7 @@
 package dataplane
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -23,12 +24,15 @@ const (
 	contextDelNetPol  = "DEL-NETPOL"
 )
 
+var ErrInvalidApplyConfig = errors.New("invalid apply config")
+
 type PolicyMode string
 
 // TODO put NodeName in Config?
 type Config struct {
-	ApplyDataPlaneMaxBatches int
-	ApplyDataPlaneInterval   time.Duration
+	ApplyInBackground bool
+	ApplyMaxBatches   int
+	ApplyInterval     time.Duration
 	*ipsets.IPSetManagerCfg
 	*policies.PolicyManagerCfg
 }
@@ -51,16 +55,10 @@ func newEndpointCache() *endpointCache {
 	return &endpointCache{cache: make(map[string]*npmEndpoint)}
 }
 
-type applyCounter struct {
+type applyInfo struct {
 	sync.Mutex
-	count int
-}
-
-func (a *applyCounter) isZero() bool {
-	a.Lock()
-	defer a.Unlock()
-
-	return a.count == 0
+	numBatches    int
+	inBootupPhase bool
 }
 
 type DataPlane struct {
@@ -74,7 +72,7 @@ type DataPlane struct {
 	endpointCache  *endpointCache
 	ioShim         *common.IOShim
 	updatePodCache *updatePodCache
-	batchCounter   *applyCounter
+	applyInfo      *applyInfo
 	stopChannel    <-chan struct{}
 }
 
@@ -92,12 +90,17 @@ func NewDataPlane(nodeName string, ioShim *common.IOShim, cfg *Config, stopChann
 		nodeName:       nodeName,
 		ioShim:         ioShim,
 		updatePodCache: newUpdatePodCache(),
-		batchCounter:   &applyCounter{},
-		stopChannel:    stopChannel,
+		applyInfo: &applyInfo{
+			inBootupPhase: true,
+		},
+		stopChannel: stopChannel,
 	}
 
 	if dp.configuredToApplyInBackground() {
-		klog.Infof("[DataPlane] dataplane configured to apply in background every %v or every %d calls to ApplyDataPlane()", dp.ApplyDataPlaneInterval, dp.ApplyDataPlaneMaxBatches)
+		klog.Infof("[DataPlane] dataplane configured to apply in background every %v or every %d calls to ApplyDataPlane()", dp.ApplyInterval, dp.ApplyMaxBatches)
+		if dp.ApplyMaxBatches <= 0 || dp.ApplyInterval == 0 {
+			return nil, ErrInvalidApplyConfig
+		}
 	} else {
 		klog.Info("[DataPlane] dataplane configured to NOT apply in background")
 	}
@@ -114,6 +117,19 @@ func NewDataPlane(nodeName string, ioShim *common.IOShim, cfg *Config, stopChann
 func (dp *DataPlane) BootupDataplane() error {
 	// NOTE: used to create an all-namespaces set, but there's no need since it will be created by the control plane
 	return dp.bootupDataPlane() //nolint:wrapcheck // unnecessary to wrap error
+}
+
+// FinishBootupPhase marks the point when Pod Controller is starting to run, so dp.AddPolicy() can no longer apply IPSets in the background.
+// This function must be called on Windows when ApplyInBackground is true.
+func (dp *DataPlane) FinishBootupPhase() {
+	if !dp.configuredToApplyInBackground() {
+		return
+	}
+
+	dp.applyInfo.Lock()
+	defer dp.applyInfo.Unlock()
+
+	dp.applyInfo.inBootupPhase = false
 }
 
 // RunPeriodicTasks runs periodic tasks. Should only be called once.
@@ -145,7 +161,7 @@ func (dp *DataPlane) RunPeriodicTasks() {
 	}
 
 	go func() {
-		ticker := time.NewTicker(dp.ApplyDataPlaneInterval)
+		ticker := time.NewTicker(dp.ApplyInterval)
 		defer ticker.Stop()
 
 		for {
@@ -153,7 +169,10 @@ func (dp *DataPlane) RunPeriodicTasks() {
 			case <-dp.stopChannel:
 				return
 			case <-ticker.C:
-				if dp.batchCounter.isZero() {
+				dp.applyInfo.Lock()
+				numBatches := dp.applyInfo.numBatches
+				dp.applyInfo.Unlock()
+				if numBatches == 0 {
 					continue
 				}
 
@@ -271,14 +290,14 @@ func (dp *DataPlane) ApplyDataPlane() error {
 }
 
 func (dp *DataPlane) incrementBatchAndApplyIfNeeded(context string) error {
-	dp.batchCounter.Lock()
-	dp.batchCounter.count++
-	newCount := dp.batchCounter.count
-	dp.batchCounter.Unlock()
+	dp.applyInfo.Lock()
+	dp.applyInfo.numBatches++
+	newCount := dp.applyInfo.numBatches
+	dp.applyInfo.Unlock()
 
 	klog.Infof("[DataPlane] [%s] new batch count: %d", context, newCount)
 
-	if newCount >= dp.ApplyDataPlaneMaxBatches {
+	if newCount >= dp.ApplyMaxBatches {
 		klog.Infof("[DataPlane] [%s] applying now since reached maximum batch count: %d", context, newCount)
 		return dp.applyDataPlaneNow(context)
 	}
@@ -295,9 +314,9 @@ func (dp *DataPlane) applyDataPlaneNow(context string) error {
 	klog.Infof("[DataPlane] [ApplyDataPlane] [%s] finished applying ipsets", context)
 
 	if dp.configuredToApplyInBackground() {
-		dp.batchCounter.Lock()
-		dp.batchCounter.count = 0
-		dp.batchCounter.Unlock()
+		dp.applyInfo.Lock()
+		dp.applyInfo.numBatches = 0
+		dp.applyInfo.Unlock()
 	}
 
 	// NOTE: ideally we won't refresh Pod Endpoints if the updatePodCache is empty
@@ -362,19 +381,22 @@ func (dp *DataPlane) AddPolicy(policy *policies.NPMNetworkPolicy) error {
 		return fmt.Errorf("[DataPlane] error while adding Rule IPSet references: %w", err)
 	}
 
-	endpointList, err := dp.getEndpointsToApplyPolicy(policy)
-	if err != nil {
-		return fmt.Errorf("[DataPlane] error while getting endpoints to apply policy before applying dataplane: %w", err)
-	}
-
-	if dp.configuredToApplyInBackground() && len(endpointList) == 0 {
-		// pMgr.AddPolicy() does not touch the kernel in Windows when there are no endpoints to apply on
-		if err := dp.incrementBatchAndApplyIfNeeded(contextAddNetPol); err != nil {
+	var endpointList map[string]string
+	if dp.inBootupPhase() {
+		// During bootup phase, the Pod controller will not be running.
+		// We don't need to worry about adding Policies to Endpoints, so we don't need IPSets in the kernel yet.
+		// Ideally, we get all NetworkPolicies in the cache before the Pod controller starts
+		if err = dp.incrementBatchAndApplyIfNeeded(contextAddNetPol); err != nil {
 			return err
 		}
 	} else {
-		if err := dp.applyDataPlaneNow(contextAddNetPol); err != nil {
+		if err = dp.applyDataPlaneNow(contextAddNetPol); err != nil {
 			return err
+		}
+
+		endpointList, err = dp.getEndpointsToApplyPolicy(policy)
+		if err != nil {
+			return fmt.Errorf("[DataPlane] error while getting endpoints to apply policy after applying dataplane: %w", err)
 		}
 	}
 
@@ -436,12 +458,6 @@ func (dp *DataPlane) RemovePolicy(policyKey string) error {
 	err = dp.deleteIPSetsAndReferences(policy.AllPodSelectorIPSets(), policy.PolicyKey, ipsets.SelectorType)
 	if err != nil {
 		return err
-	}
-
-	if dp.configuredToApplyInBackground() {
-		// No need to ApplyDataplane since any IPSets modified above are strictly used by this NetworkPolicy.
-		// Above modifications remove all members of the IPSets and delete the IPSets
-		return dp.incrementBatchAndApplyIfNeeded(contextDelNetPol)
 	}
 
 	return dp.applyDataPlaneNow(contextApplyDP)
@@ -566,5 +582,16 @@ func (dp *DataPlane) deleteIPSetsAndReferences(sets []*ipsets.TranslatedIPSet, n
 }
 
 func (dp *DataPlane) configuredToApplyInBackground() bool {
-	return util.IsWindowsDP() && dp.ApplyDataPlaneMaxBatches > 0 && dp.ApplyDataPlaneInterval > 0
+	return util.IsWindowsDP() && dp.ApplyInBackground
+}
+
+func (dp *DataPlane) inBootupPhase() bool {
+	if !dp.configuredToApplyInBackground() {
+		return false
+	}
+
+	dp.applyInfo.Lock()
+	defer dp.applyInfo.Unlock()
+
+	return dp.applyInfo.inBootupPhase
 }
