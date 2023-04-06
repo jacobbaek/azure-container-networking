@@ -11,7 +11,6 @@ import (
 	dptestutils "github.com/Azure/azure-container-networking/npm/pkg/dataplane/testutils"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
-	"k8s.io/klog"
 )
 
 const (
@@ -29,6 +28,10 @@ func TestPodEndpointAssignment(t *testing.T) {
 
 func TestCapzCalico(t *testing.T) {
 	testSerialCases(t, capzCalicoTests())
+}
+
+func TestRemoteEndpoints(t *testing.T) {
+	testSerialCases(t, remoteEndpointTests())
 }
 
 func TestAllMultiJobCases(t *testing.T) {
@@ -54,7 +57,6 @@ func testSerialCases(t *testing.T, tests []*SerialTestCase) {
 		}
 
 		t.Run(tt.Description, func(t *testing.T) {
-			klog.Infof("tt in: %+v", tt)
 			t.Logf("beginning test #%d. Description: [%s]. Tags: %+v", i, tt.Description, tt.Tags)
 
 			hns := ipsets.GetHNSFake(t, tt.DpCfg.NetworkName)
