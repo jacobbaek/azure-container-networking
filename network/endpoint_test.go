@@ -185,14 +185,14 @@ var _ = Describe("Test Endpoint", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(ep).NotTo(BeNil())
 				Expect(ep.Id).To(Equal(epInfo.Id))
-				Expect(ep.Gateways).To(BeNil())
+				Expect(ep.Gateways).To(BeEmpty())
 			})
 			It("should have fields set", func() {
-				nw = &network{
+				nw2 := &network{
 					Endpoints: map[string]*endpoint{},
 					extIf:     &externalInterface{IPv4Gateway: net.ParseIP("192.168.0.1")},
 				}
-				ep, err := nw.newEndpointImpl(nil, netlink.NewMockNetlink(false, ""), platform.NewMockExecClient(false),
+				ep, err := nw2.newEndpointImpl(nil, netlink.NewMockNetlink(false, ""), platform.NewMockExecClient(false),
 					netio.NewMockNetIO(false, 0), NewMockEndpointClient(false), epInfo)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(ep).NotTo(BeNil())
