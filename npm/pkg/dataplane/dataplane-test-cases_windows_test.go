@@ -2165,6 +2165,13 @@ func remoteEndpointTests() []*SerialTestCase {
 							RemotePorts:     "",
 							Priority:        222,
 						},
+						{
+							ID:              "azure-acl-x-base",
+							Action:          "Allow",
+							Direction:       "In",
+							RemoteAddresses: testNodeIP,
+							Priority:        201,
+						},
 					},
 				},
 			},

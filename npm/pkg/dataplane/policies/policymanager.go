@@ -151,11 +151,11 @@ func (pMgr *PolicyManager) AddPolicy(policy *NPMNetworkPolicy, endpointList map[
 	}
 
 	// update Prometheus metrics on success
-	numEndpoints := 1
 	if util.IsWindowsDP() {
-		numEndpoints = len(endpointList)
+		metrics.IncNumACLRulesBy((1 + policy.numACLRulesProducedInKernel()) * len(endpointList))
+	} else {
+		metrics.IncNumACLRulesBy(policy.numACLRulesProducedInKernel())
 	}
-	metrics.IncNumACLRulesBy((1 + policy.numACLRulesProducedInKernel()) * numEndpoints)
 
 	pMgr.policyMap.cache[policy.PolicyKey] = policy
 	return nil
@@ -195,11 +195,12 @@ func (pMgr *PolicyManager) RemovePolicy(policyKey string) error {
 	}
 
 	// update Prometheus metrics on success
-	numEndpointsRemoved := 1
 	if util.IsWindowsDP() {
-		numEndpointsRemoved = numEndpointsBefore - len(policy.PodEndpoints)
+		numEndpointsRemoved := numEndpointsBefore - len(policy.PodEndpoints)
+		metrics.DecNumACLRulesBy((1 + policy.numACLRulesProducedInKernel()) * numEndpointsRemoved)
+	} else {
+		metrics.DecNumACLRulesBy(policy.numACLRulesProducedInKernel())
 	}
-	metrics.DecNumACLRulesBy((1 + policy.numACLRulesProducedInKernel()) * numEndpointsRemoved)
 
 	// remove policy from cache
 	delete(pMgr.policyMap.cache, policyKey)
