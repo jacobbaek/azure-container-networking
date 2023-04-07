@@ -35,6 +35,10 @@ func TestApplyInBackground(t *testing.T) {
 	testSerialCases(t, applyInBackgroundTests(), time.Duration(100*time.Millisecond))
 }
 
+func TestApplyInBackgroundBootupPhase(t *testing.T) {
+	testSerialCases(t, applyInBackgroundBootupPhaseTests(), time.Duration(100*time.Millisecond))
+}
+
 func TestAllMultiJobCases(t *testing.T) {
 	testMultiJobCases(t, getAllMultiJobTests(), 0)
 }
@@ -47,10 +51,6 @@ func testSerialCases(t *testing.T, tests []*SerialTestCase, finalSleep time.Dura
 	for i, tt := range tests {
 		i := i
 		tt := tt
-
-		if tt.Description != "pod created on node, then relevant policy created" {
-			continue
-		}
 
 		for _, tag := range tt.Tags {
 			if tag == skipTestTag {
@@ -74,6 +74,8 @@ func testSerialCases(t *testing.T, tests []*SerialTestCase, finalSleep time.Dura
 			require.NoError(t, err, "failed to initialize dp")
 			require.NotNil(t, dp, "failed to initialize dp (nil)")
 
+			dp.RunPeriodicTasks()
+
 			for j, a := range tt.Actions {
 				var err error
 				if a.HNSAction != nil {
@@ -87,6 +89,8 @@ func testSerialCases(t *testing.T, tests []*SerialTestCase, finalSleep time.Dura
 
 			time.Sleep(finalSleep)
 			dptestutils.VerifyHNSCache(t, hns, tt.ExpectedSetPolicies, tt.ExpectedEnpdointACLs)
+
+			// require.FailNow(t, "test failed")
 		})
 	}
 }
@@ -116,6 +120,8 @@ func testMultiJobCases(t *testing.T, tests []*MultiJobTestCase, finalSleep time.
 			// the dp is necessary for NPM tests
 			dp, err := NewDataPlane(thisNode, io, tt.DpCfg, nil)
 			require.NoError(t, err, "failed to initialize dp")
+
+			dp.RunPeriodicTasks()
 
 			backgroundErrors := make(chan error, len(tt.Jobs))
 			wg := new(sync.WaitGroup)

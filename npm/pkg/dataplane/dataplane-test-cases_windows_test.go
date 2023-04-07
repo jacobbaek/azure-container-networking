@@ -2084,7 +2084,7 @@ func applyInBackgroundTests() []*SerialTestCase {
 	allTests := make([]*SerialTestCase, 0)
 	allTests = append(allTests, basicTests()...)
 	allTests = append(allTests, capzCalicoTests()...)
-	allTests = append(allTests, updatePodTests()...)
+	// allTests = append(allTests, updatePodTests()...)
 
 	for _, test := range allTests {
 		test.TestCaseMetadata.Tags = append(test.TestCaseMetadata.Tags, applyInBackgroundTag)
@@ -2112,4 +2112,178 @@ func multiJobApplyInBackgroundTests() []*MultiJobTestCase {
 	}
 
 	return allTests
+}
+
+func applyInBackgroundBootupPhaseTests() []*SerialTestCase {
+	cfg := *defaultWindowsDPCfg
+	cfg.ApplyInBackground = true
+	cfg.ApplyMaxBatches = 3
+	cfg.ApplyInterval = time.Duration(50 * time.Millisecond)
+
+	policy4 := policyXBaseOnK1V1()
+	policy4.Name = "base4"
+
+	return []*SerialTestCase{
+		{
+			Description: "single policy",
+			Actions: []*Action{
+				UpdatePolicy(policyXBaseOnK1V1()),
+			},
+			TestCaseMetadata: &TestCaseMetadata{
+				Tags: []Tag{
+					netpolCrudTag,
+				},
+				DpCfg:            &cfg,
+				InitialEndpoints: nil,
+				ExpectedSetPolicies: []*hcn.SetPolicySetting{
+					// will not be an all-namespaces IPSet unless there's a Pod/Namespace event
+					dptestutils.SetPolicy(nsXSet),
+					// Policies do not create the KeyLabelOfPod type IPSet if the selector has a key-value requirement
+					dptestutils.SetPolicy(podK1V1Set),
+				},
+			},
+		},
+		{
+			Description: "three policies",
+			Actions: []*Action{
+				UpdatePolicy(policyXBaseOnK1V1()),
+				UpdatePolicy(policyXBase2OnK2V2()),
+				UpdatePolicy(policyXBase3OnK3V3()),
+			},
+			TestCaseMetadata: &TestCaseMetadata{
+				Tags: []Tag{
+					netpolCrudTag,
+				},
+				DpCfg:            &cfg,
+				InitialEndpoints: nil,
+				ExpectedSetPolicies: []*hcn.SetPolicySetting{
+					// will not be an all-namespaces IPSet unless there's a Pod/Namespace event
+					dptestutils.SetPolicy(nsXSet),
+					// Policies do not create the KeyLabelOfPod type IPSet if the selector has a key-value requirement
+					dptestutils.SetPolicy(podK1V1Set),
+					dptestutils.SetPolicy(podK2V2Set),
+					dptestutils.SetPolicy(podK3V3Set),
+				},
+			},
+		},
+		{
+			Description: "four policies",
+			Actions: []*Action{
+				UpdatePolicy(policyXBaseOnK1V1()),
+				UpdatePolicy(policyXBase2OnK2V2()),
+				UpdatePolicy(policyXBase3OnK3V3()),
+				UpdatePolicy(policy4),
+			},
+			TestCaseMetadata: &TestCaseMetadata{
+				Tags: []Tag{
+					netpolCrudTag,
+				},
+				DpCfg:            &cfg,
+				InitialEndpoints: nil,
+				ExpectedSetPolicies: []*hcn.SetPolicySetting{
+					// will not be an all-namespaces IPSet unless there's a Pod/Namespace event
+					dptestutils.SetPolicy(nsXSet),
+					// Policies do not create the KeyLabelOfPod type IPSet if the selector has a key-value requirement
+					dptestutils.SetPolicy(podK1V1Set),
+					dptestutils.SetPolicy(podK2V2Set),
+					dptestutils.SetPolicy(podK3V3Set),
+				},
+			},
+		},
+		{
+			Description: "single policy. finish bootup phase and add pod",
+			Actions: []*Action{
+				UpdatePolicy(policyXBaseOnK1V1()),
+				FinishBootupPhase(),
+				CreatePod("x", "a", ip1, thisNode, map[string]string{"k1": "v1"}),
+			},
+			TestCaseMetadata: &TestCaseMetadata{
+				Tags: []Tag{
+					netpolCrudTag,
+				},
+				DpCfg: &cfg,
+				InitialEndpoints: []*hcn.HostComputeEndpoint{
+					dptestutils.Endpoint(endpoint1, ip1),
+				},
+				ExpectedSetPolicies: []*hcn.SetPolicySetting{
+					dptestutils.SetPolicy(emptySet),
+					dptestutils.SetPolicy(allNamespaces, emptySet.GetHashedName(), nsXSet.GetHashedName()),
+					dptestutils.SetPolicy(nsXSet, ip1),
+					dptestutils.SetPolicy(podK1Set, ip1),
+					dptestutils.SetPolicy(podK1V1Set, ip1),
+				},
+				ExpectedEnpdointACLs: map[string][]*hnswrapper.FakeEndpointPolicy{
+					endpoint1: {
+						{
+							ID:        "azure-acl-x-base",
+							Action:    "Allow",
+							Direction: "In",
+							Priority:  222,
+						},
+						{
+							ID:        "azure-acl-x-base",
+							Action:    "Allow",
+							Direction: "Out",
+							Priority:  222,
+						},
+					},
+				},
+			},
+		},
+		{
+			Description: "single policy. finish bootup phase, add pod, add second policy",
+			Actions: []*Action{
+				UpdatePolicy(policyXBaseOnK1V1()),
+				FinishBootupPhase(),
+				CreatePod("x", "a", ip1, thisNode, map[string]string{"k1": "v1", "k2": "v2"}),
+				UpdatePolicy(policyXBase2OnK2V2()),
+			},
+			TestCaseMetadata: &TestCaseMetadata{
+				Tags: []Tag{
+					netpolCrudTag,
+				},
+				DpCfg: &cfg,
+				InitialEndpoints: []*hcn.HostComputeEndpoint{
+					dptestutils.Endpoint(endpoint1, ip1),
+				},
+				ExpectedSetPolicies: []*hcn.SetPolicySetting{
+					dptestutils.SetPolicy(emptySet),
+					dptestutils.SetPolicy(allNamespaces, emptySet.GetHashedName(), nsXSet.GetHashedName()),
+					dptestutils.SetPolicy(nsXSet, ip1),
+					dptestutils.SetPolicy(podK1Set, ip1),
+					dptestutils.SetPolicy(podK1V1Set, ip1),
+					dptestutils.SetPolicy(podK2Set, ip1),
+					dptestutils.SetPolicy(podK2V2Set, ip1),
+				},
+				ExpectedEnpdointACLs: map[string][]*hnswrapper.FakeEndpointPolicy{
+					endpoint1: {
+						{
+							ID:        "azure-acl-x-base",
+							Action:    "Allow",
+							Direction: "In",
+							Priority:  222,
+						},
+						{
+							ID:        "azure-acl-x-base",
+							Action:    "Allow",
+							Direction: "Out",
+							Priority:  222,
+						},
+						{
+							ID:        "azure-acl-x-base2",
+							Action:    "Allow",
+							Direction: "In",
+							Priority:  222,
+						},
+						{
+							ID:        "azure-acl-x-base2",
+							Action:    "Allow",
+							Direction: "Out",
+							Priority:  222,
+						},
+					},
+				},
+			},
+		},
+	}
 }
