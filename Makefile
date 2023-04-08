@@ -64,8 +64,8 @@ CNI_MULTITENANCY_BUILD_DIR = $(BUILD_DIR)/cni-multitenancy
 CNI_MULTITENANCY_TRANSPARENT_VLAN_BUILD_DIR = $(BUILD_DIR)/cni-multitenancy-transparent-vlan
 CNI_SWIFT_BUILD_DIR = $(BUILD_DIR)/cni-swift
 CNI_OVERLAY_BUILD_DIR = $(BUILD_DIR)/cni-overlay
-CNI_DUALSTACK_BUILD_DIR = $(BUILD_DIR)/cni-dualstack
 CNI_BAREMETAL_BUILD_DIR = $(BUILD_DIR)/cni-baremetal
+CNI_DUALSTACK_BUILD_DIR = $(BUILD_DIR)/cni-dualstack
 CNS_BUILD_DIR = $(BUILD_DIR)/cns
 NPM_BUILD_DIR = $(BUILD_DIR)/npm
 TOOLS_DIR = $(REPO_ROOT)/build/tools
@@ -94,8 +94,8 @@ CNI_MULTITENANCY_ARCHIVE_NAME = azure-vnet-cni-multitenancy-$(GOOS)-$(GOARCH)-$(
 CNI_MULTITENANCY_TRANSPARENT_VLAN_ARCHIVE_NAME = azure-vnet-cni-multitenancy-transparent-vlan-$(GOOS)-$(GOARCH)-$(CNI_VERSION).$(ARCHIVE_EXT)
 CNI_SWIFT_ARCHIVE_NAME = azure-vnet-cni-swift-$(GOOS)-$(GOARCH)-$(CNI_VERSION).$(ARCHIVE_EXT)
 CNI_OVERLAY_ARCHIVE_NAME = azure-vnet-cni-overlay-$(GOOS)-$(GOARCH)-$(CNI_VERSION).$(ARCHIVE_EXT)
-CNI_DUALSTACK_ARCHIVE_NAME = azure-vnet-cni-dualstack-overlay-$(GOOS)-$(GOARCH)-$(CNI_VERSION).$(ARCHIVE_EXT)
 CNI_BAREMETAL_ARCHIVE_NAME = azure-vnet-cni-baremetal-$(GOOS)-$(GOARCH)-$(CNI_VERSION).$(ARCHIVE_EXT)
+CNI_DUALSTACK_ARCHIVE_NAME = azure-vnet-cni-overlay-dualstack-$(GOOS)-$(GOARCH)-$(CNI_VERSION).$(ARCHIVE_EXT)
 CNM_ARCHIVE_NAME = azure-vnet-cnm-$(GOOS)-$(GOARCH)-$(ACN_VERSION).$(ARCHIVE_EXT)
 CNS_ARCHIVE_NAME = azure-cns-$(GOOS)-$(GOARCH)-$(CNS_VERSION).$(ARCHIVE_EXT)
 NPM_ARCHIVE_NAME = azure-npm-$(GOOS)-$(GOARCH)-$(NPM_VERSION).$(ARCHIVE_EXT)
@@ -315,7 +315,7 @@ acncli-image-name-and-tag: # util target to print the CNI manager image name and
 	@echo $(IMAGE_REGISTRY)/$(ACNCLI_IMAGE):$(ACNCLI_PLATFORM_TAG)
 
 acncli-image: ## build cni-manager container image.
-	$(MAKE) container \
+	$ (MAKE) container \
 		DOCKERFILE=tools/acncli/Dockerfile \
 		IMAGE=$(ACNCLI_IMAGE) \
 		TAG=$(ACNCLI_PLATFORM_TAG)
@@ -625,7 +625,7 @@ endif
 	cp telemetry/azure-vnet-telemetry.config $(CNI_OVERLAY_BUILD_DIR)/azure-vnet-telemetry.config
 	cp $(CNI_BUILD_DIR)/azure-vnet$(EXE_EXT) $(CNI_BUILD_DIR)/azure-vnet-ipam$(EXE_EXT) $(CNI_BUILD_DIR)/azure-vnet-telemetry$(EXE_EXT) $(CNI_OVERLAY_BUILD_DIR)
 	cd $(CNI_OVERLAY_BUILD_DIR) && $(ARCHIVE_CMD) $(CNI_OVERLAY_ARCHIVE_NAME) azure-vnet$(EXE_EXT) azure-vnet-ipam$(EXE_EXT) azure-vnet-telemetry$(EXE_EXT) 10-azure.conflist azure-vnet-telemetry.config
-	
+
 	$(MKDIR) $(CNI_DUALSTACK_BUILD_DIR)
 	cp cni/azure-$(GOOS)-swift-overlay-dualstack.conflist $(CNI_DUALSTACK_BUILD_DIR)/10-azure.conflist
 	cp telemetry/azure-vnet-telemetry.config $(CNI_DUALSTACK_BUILD_DIR)/azure-vnet-telemetry.config
