@@ -11,33 +11,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// CreateIPConfigReq creates an IPConfigsRequest from the given CNI args.
-func CreateIPConfigsReq(args *cniSkel.CmdArgs) (cns.IPConfigsRequest, error) {
-	podConf, err := parsePodConf(args.Args)
-	if err != nil {
-		return cns.IPConfigsRequest{}, errors.Wrapf(err, "failed to parse pod config from CNI args")
-	}
-
-	podInfo := cns.KubernetesPodInfo{
-		PodName:      string(podConf.K8S_POD_NAME),
-		PodNamespace: string(podConf.K8S_POD_NAMESPACE),
-	}
-
-	orchestratorContext, err := json.Marshal(podInfo)
-	if err != nil {
-		return cns.IPConfigsRequest{}, errors.Wrapf(err, "failed to marshal podInfo to JSON")
-	}
-
-	req := cns.IPConfigsRequest{
-		PodInterfaceID:      args.ContainerID,
-		InfraContainerID:    args.ContainerID,
-		OrchestratorContext: orchestratorContext,
-		Ifname:              args.IfName,
-	}
-
-	return req, nil
-}
-
 // CreateIPConfigReq creates an IPConfigRequest from the given CNI args.
 func CreateIPConfigReq(args *cniSkel.CmdArgs) (cns.IPConfigRequest, error) {
 	podConf, err := parsePodConf(args.Args)
@@ -66,23 +39,18 @@ func CreateIPConfigReq(args *cniSkel.CmdArgs) (cns.IPConfigRequest, error) {
 }
 
 // ProcessIPConfigResp processes the IPConfigResponse from the CNS.
-func ProcessIPConfigResp(resp *cns.IPConfigsResponse) (*[]netip.Prefix, error) {
-	podIPNets := make([]netip.Prefix, len(resp.PodIPInfo))
-
-	for i := range resp.PodIPInfo {
-		podCIDR := fmt.Sprintf(
-			"%s/%d",
-			resp.PodIPInfo[i].PodIPConfig.IPAddress,
-			resp.PodIPInfo[i].NetworkContainerPrimaryIPConfig.IPSubnet.PrefixLength,
-		)
-		podIPNet, err := netip.ParsePrefix(podCIDR)
-		if err != nil {
-			return nil, errors.Wrapf(err, "cns returned invalid pod CIDR %q", podCIDR)
-		}
-		podIPNets[i] = podIPNet
+func ProcessIPConfigResp(resp *cns.IPConfigResponse) (*netip.Prefix, error) {
+	podCIDR := fmt.Sprintf(
+		"%s/%d",
+		resp.PodIpInfo.PodIPConfig.IPAddress,
+		resp.PodIpInfo.NetworkContainerPrimaryIPConfig.IPSubnet.PrefixLength,
+	)
+	podIPNet, err := netip.ParsePrefix(podCIDR)
+	if err != nil {
+		return nil, errors.Wrapf(err, "cns returned invalid pod CIDR %q", podCIDR)
 	}
 
-	return &podIPNets, nil
+	return &podIPNet, nil
 }
 
 type k8sPodEnvArgs struct {
