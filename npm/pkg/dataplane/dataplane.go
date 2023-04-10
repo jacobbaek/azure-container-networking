@@ -27,35 +27,35 @@ type Config struct {
 type updatePodCache struct {
 	sync.Mutex
 	cache map[string]*updateNPMPod
-	// order maintains the FIFO order of the pods in the cache.
-	// This makes sure we handle sequence 2 of issue 1729 with the same order as the control plane.
-	// It also lets us update Pod ACLs in the same order as the control plane so that
+	// queue maintains the FIFO queue of the pods in the cache.
+	// This makes sure we handle sequence 2 of issue 1729 with the same queue as the control plane.
+	// It also lets us update Pod ACLs in the same queue as the control plane so that
 	// e.g. the first Pod created is the first Pod to have proper connectivity.
-	order []string
+	queue []string
 }
 
 func newUpdatePodCache() *updatePodCache {
 	return &updatePodCache{
 		cache: make(map[string]*updateNPMPod),
-		order: make([]string, 0),
+		queue: make([]string, 0),
 	}
 }
 
-// cleanupOrder removes all elements in the order slice which aren't in the cache.
-// cleanupOrder should be called while holding the updatePodCache lock.
-func (u *updatePodCache) cleanupOrder() {
-	newOrder := make([]string, 0)
+// removeDeletedItemsFromQueue removes all elements in the queue slice which aren't in the cache.
+// removeDeletedItemsFromQueue should be called while holding the updatePodCache lock.
+func (u *updatePodCache) removeDeletedItemsFromQueue() {
 	if len(u.cache) == 0 {
-		u.order = newOrder
+		u.queue = make([]string, 0)
 		return
 	}
 
-	for _, podKey := range u.order {
+	newQueue := make([]string, 0)
+	for _, podKey := range u.queue {
 		if _, ok := u.cache[podKey]; ok {
-			newOrder = append(newOrder, podKey)
+			newQueue = append(newQueue, podKey)
 		}
 	}
-	u.order = newOrder
+	u.queue = newQueue
 }
 
 type endpointCache struct {
@@ -174,7 +174,9 @@ func (dp *DataPlane) AddToSets(setNames []*ipsets.IPSetMetadata, podMetadata *Po
 			klog.Infof("[DataPlane] {AddToSet} pod key %s not found in updatePodCache. creating a new obj", podMetadata.PodKey)
 			updatePod = newUpdateNPMPod(podMetadata)
 			dp.updatePodCache.cache[podMetadata.PodKey] = updatePod
-			dp.updatePodCache.order = append(dp.updatePodCache.order, podMetadata.PodKey)
+
+			// add to queue only if not in the cache/queue already
+			dp.updatePodCache.queue = append(dp.updatePodCache.queue, podMetadata.PodKey)
 		}
 
 		updatePod.updateIPSetsToAdd(setNames)
@@ -203,7 +205,9 @@ func (dp *DataPlane) RemoveFromSets(setNames []*ipsets.IPSetMetadata, podMetadat
 			klog.Infof("[DataPlane] {RemoveFromSet} pod key %s not found in updatePodCache. creating a new obj", podMetadata.PodKey)
 			updatePod = newUpdateNPMPod(podMetadata)
 			dp.updatePodCache.cache[podMetadata.PodKey] = updatePod
-			dp.updatePodCache.order = append(dp.updatePodCache.order, podMetadata.PodKey)
+
+			// add to queue only if not in the cache/queue already
+			dp.updatePodCache.queue = append(dp.updatePodCache.queue, podMetadata.PodKey)
 		}
 
 		updatePod.updateIPSetsToRemove(setNames)
@@ -248,7 +252,7 @@ func (dp *DataPlane) ApplyDataPlane() error {
 		// do not refresh endpoints if the updatePodCache is empty
 		dp.updatePodCache.Lock()
 		if len(dp.updatePodCache.cache) == 0 {
-			dp.updatePodCache.cleanupOrder()
+			dp.updatePodCache.removeDeletedItemsFromQueue()
 			dp.updatePodCache.Unlock()
 			return nil
 		}
@@ -265,11 +269,11 @@ func (dp *DataPlane) ApplyDataPlane() error {
 		// prevents another ApplyDataplane call from updating the same pods
 		dp.updatePodCache.Lock()
 		defer func() {
-			dp.updatePodCache.cleanupOrder()
+			dp.updatePodCache.removeDeletedItemsFromQueue()
 			dp.updatePodCache.Unlock()
 		}()
 
-		for _, podKey := range dp.updatePodCache.order {
+		for _, podKey := range dp.updatePodCache.queue {
 			pod, ok := dp.updatePodCache.cache[podKey]
 			if !ok {
 				metrics.SendErrorLogAndMetric(util.DaemonDataplaneID, "[DataPlane] skipping update since pod not found in updatePodCache. podKey: %s", podKey)

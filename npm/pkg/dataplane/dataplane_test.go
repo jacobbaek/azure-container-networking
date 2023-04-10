@@ -260,28 +260,28 @@ func TestUpdatePodCacheCleanupOrder(t *testing.T) {
 	upc.cache[pod2.PodKey] = pod2
 	upc.cache[pod3.PodKey] = pod3
 
-	upc.order = append(upc.order, pod1.PodKey, pod2.PodKey, pod3.PodKey)
+	upc.queue = append(upc.queue, pod1.PodKey, pod2.PodKey, pod3.PodKey)
 
-	upc.cleanupOrder()
-	require.Equal(t, upc.order, []string{pod1.PodKey, pod2.PodKey, pod3.PodKey})
+	upc.removeDeletedItemsFromQueue()
+	require.Equal(t, upc.queue, []string{pod1.PodKey, pod2.PodKey, pod3.PodKey})
 
 	delete(upc.cache, pod1.PodKey)
-	upc.cleanupOrder()
-	require.Equal(t, upc.order, []string{pod2.PodKey, pod3.PodKey})
+	upc.removeDeletedItemsFromQueue()
+	require.Equal(t, upc.queue, []string{pod2.PodKey, pod3.PodKey})
 
-	upc.order = append(upc.order, pod1.PodKey)
+	upc.queue = append(upc.queue, pod1.PodKey)
 	upc.cache[pod1.PodKey] = pod1
-	upc.cleanupOrder()
-	require.Equal(t, upc.order, []string{pod2.PodKey, pod3.PodKey, pod1.PodKey})
+	upc.removeDeletedItemsFromQueue()
+	require.Equal(t, upc.queue, []string{pod2.PodKey, pod3.PodKey, pod1.PodKey})
 
 	delete(upc.cache, pod2.PodKey)
 	delete(upc.cache, pod3.PodKey)
-	upc.cleanupOrder()
-	require.Equal(t, upc.order, []string{pod1.PodKey})
+	upc.removeDeletedItemsFromQueue()
+	require.Equal(t, upc.queue, []string{pod1.PodKey})
 
 	delete(upc.cache, pod1.PodKey)
-	upc.cleanupOrder()
-	require.Equal(t, upc.order, []string{})
+	upc.removeDeletedItemsFromQueue()
+	require.Equal(t, upc.queue, []string{})
 }
 
 func getBootupTestCalls() []testutils.TestCmd {
