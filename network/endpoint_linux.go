@@ -274,8 +274,6 @@ func addRoutes(nl netlink.NetlinkInterface, netioshim netio.NetIOInterface, inte
 	ifIndex := 0
 
 	for _, route := range routes {
-		log.Printf("[net] Adding IP route %+v to link %v.", route, interfaceName)
-
 		if route.DevName != "" {
 			devIf, _ := netioshim.GetNetworkInterfaceByName(route.DevName)
 			ifIndex = devIf.Index
@@ -320,6 +318,7 @@ func addRoutes(nl netlink.NetlinkInterface, netioshim netio.NetIOInterface, inte
 			}
 		}
 
+		log.Printf("[net] Adding IP route %+v to link %v.", route, interfaceName)
 		if err := nl.AddIPRoute(nlRoute); err != nil {
 			if !strings.Contains(strings.ToLower(err.Error()), "file exists") {
 				return err
