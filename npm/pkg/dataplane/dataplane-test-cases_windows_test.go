@@ -17,7 +17,6 @@ const (
 	netpolCrudTag Tag = "netpol-crud"
 	reconcileTag  Tag = "reconcile"
 	calicoTag     Tag = "calico"
-	skipTestTag   Tag = "skip-test"
 )
 
 const (
@@ -1298,7 +1297,7 @@ func updatePodTests() []*SerialTestCase {
 			},
 			TestCaseMetadata: &TestCaseMetadata{
 				Tags: []Tag{
-					skipTestTag,
+
 					podCrudTag,
 					netpolCrudTag,
 				},
@@ -1359,7 +1358,7 @@ func updatePodTests() []*SerialTestCase {
 			},
 			TestCaseMetadata: &TestCaseMetadata{
 				Tags: []Tag{
-					skipTestTag,
+
 					podCrudTag,
 					netpolCrudTag,
 				},
