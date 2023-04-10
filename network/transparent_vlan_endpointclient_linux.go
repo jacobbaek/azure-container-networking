@@ -368,7 +368,7 @@ func (client *TransparentVlanEndpointClient) ConfigureContainerInterfacesAndRout
 		}
 	}
 
-	if err := client.AddDefaultRoutes(client.containerVethName, 0); err != nil {
+	if err := client.addDefaultRoutes(client.containerVethName, 0); err != nil {
 		return errors.Wrap(err, "failed container ns add default routes")
 	}
 	if err := client.AddDefaultArp(client.containerVethName, client.vnetMac.String()); err != nil {
@@ -386,16 +386,16 @@ func (client *TransparentVlanEndpointClient) ConfigureVnetInterfacesAndRoutesImp
 
 	// Add route specifying which device the pod ip(s) are on
 	routeInfoList := client.GetVnetRoutes(epInfo.IPAddresses)
-	if err = client.AddDefaultRoutes(client.vlanIfName, 0); err != nil {
+	if err = client.addDefaultRoutes(client.vlanIfName, 0); err != nil {
 		return errors.Wrap(err, "failed vnet ns add default/gateway routes (idempotent)")
 	}
 	if err = client.AddDefaultArp(client.vlanIfName, azureMac); err != nil {
 		return errors.Wrap(err, "failed vnet ns add default arp entry (idempotent)")
 	}
-	if err = addRoutes(client.netlink, client.netioshim, client.vnetVethName, routeInfoList); err != nil {
+	if err = addRoutes(client.netlink, client.netioshim, client.vnetVethName, routeInfoList, true); err != nil {
 		return errors.Wrap(err, "failed adding routes to vnet specific to this container")
 	}
-	if err = client.AddDefaultRoutes(client.vlanIfName, tunnelingTable); err != nil {
+	if err = client.addDefaultRoutes(client.vlanIfName, tunnelingTable); err != nil {
 		return errors.Wrap(err, "failed vnet ns add outbound routing table routes for tunneling (idempotent)")
 	}
 	// Return to ConfigureContainerInterfacesAndRoutes
@@ -430,7 +430,7 @@ func (client *TransparentVlanEndpointClient) GetVnetRoutes(ipAddresses []net.IPN
 // to the virtual gateway ip on linkToName device interface
 // Route 1: 169.254.1.1 dev <linkToName>
 // Route 2: default via 169.254.1.1 dev <linkToName>
-func (client *TransparentVlanEndpointClient) AddDefaultRoutes(linkToName string, table int) error {
+func (client *TransparentVlanEndpointClient) addDefaultRoutes(linkToName string, table int) error {
 	// Add route for virtualgwip (ip route add 169.254.1.1/32 dev eth0)
 	virtualGwIP, virtualGwNet, _ := net.ParseCIDR(virtualGwIPString)
 	routeInfo := RouteInfo{
@@ -439,7 +439,7 @@ func (client *TransparentVlanEndpointClient) AddDefaultRoutes(linkToName string,
 		Table: table,
 	}
 	// Difference between interface name in addRoutes and DevName: in RouteInfo?
-	if err := addRoutes(client.netlink, client.netioshim, linkToName, []RouteInfo{routeInfo}); err != nil {
+	if err := addRoutes(client.netlink, client.netioshim, linkToName, []RouteInfo{routeInfo}, false); err != nil {
 		return err
 	}
 
@@ -452,7 +452,7 @@ func (client *TransparentVlanEndpointClient) AddDefaultRoutes(linkToName string,
 		Table: table,
 	}
 
-	if err := addRoutes(client.netlink, client.netioshim, linkToName, []RouteInfo{routeInfo}); err != nil {
+	if err := addRoutes(client.netlink, client.netioshim, linkToName, []RouteInfo{routeInfo}, false); err != nil {
 		return err
 	}
 	return nil

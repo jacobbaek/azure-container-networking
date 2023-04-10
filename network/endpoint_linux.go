@@ -270,7 +270,7 @@ func (nw *network) deleteEndpointImpl(nl netlink.NetlinkInterface, plc platform.
 func (ep *endpoint) getInfoImpl(epInfo *EndpointInfo) {
 }
 
-func addRoutes(nl netlink.NetlinkInterface, netioshim netio.NetIOInterface, interfaceName string, routes []RouteInfo) error {
+func addRoutes(nl netlink.NetlinkInterface, netioshim netio.NetIOInterface, interfaceName string, routes []RouteInfo, removeRouteBeforeAdd bool) error {
 	ifIndex := 0
 
 	for _, route := range routes {
@@ -302,6 +302,22 @@ func addRoutes(nl netlink.NetlinkInterface, netioshim netio.NetIOInterface, inte
 			Protocol:  route.Protocol,
 			Scope:     route.Scope,
 			Table:     route.Table,
+		}
+
+		if removeRouteBeforeAdd {
+			delNlRoute := &netlink.Route{
+				Family:   family,
+				Dst:      &route.Dst,
+				Gw:       route.Gw,
+				Priority: route.Priority,
+				Protocol: route.Protocol,
+				Scope:    route.Scope,
+				Table:    route.Table,
+			}
+			log.Printf("[net] Deleting old IP route before add:%+v.", route)
+			if err := nl.DeleteIPRoute(delNlRoute); err != nil {
+				log.Printf("[net] Try to remove route if exists before add returns: %v", err)
+			}
 		}
 
 		if err := nl.AddIPRoute(nlRoute); err != nil {
@@ -483,7 +499,7 @@ func (nm *networkManager) updateRoutes(existingEp *EndpointInfo, targetEp *Endpo
 		return err
 	}
 
-	err = addRoutes(nm.netlink, &netio.NetIO{}, existingEp.IfName, tobeAddedRoutes)
+	err = addRoutes(nm.netlink, &netio.NetIO{}, existingEp.IfName, tobeAddedRoutes, false)
 	if err != nil {
 		return err
 	}

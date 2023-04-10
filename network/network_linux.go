@@ -118,7 +118,7 @@ func (nm *networkManager) newNetworkImpl(nwInfo *NetworkInfo, extIf *externalInt
 func (nm *networkManager) handleCommonOptions(ifName string, nwInfo *NetworkInfo) error {
 	var err error
 	if routes, exists := nwInfo.Options[RoutesKey]; exists {
-		err = addRoutes(nm.netlink, nm.netio, ifName, routes.([]RouteInfo))
+		err = addRoutes(nm.netlink, nm.netio, ifName, routes.([]RouteInfo), false)
 		if err != nil {
 			return err
 		}
@@ -152,7 +152,7 @@ func (nm *networkManager) deleteNetworkImpl(nw *network) error {
 	return nil
 }
 
-//  SaveIPConfig saves the IP configuration of an interface.
+// SaveIPConfig saves the IP configuration of an interface.
 func (nm *networkManager) saveIPConfig(hostIf *net.Interface, extIf *externalInterface) error {
 	// Save the default routes on the interface.
 	routes, err := nm.netlink.GetIPRoute(&netlink.Route{Dst: &net.IPNet{}, LinkIndex: hostIf.Index})
@@ -649,7 +649,7 @@ func AddStaticRoute(nl netlink.NetlinkInterface, netioshim netio.NetIOInterface,
 	gwIP := net.ParseIP("0.0.0.0")
 	route := RouteInfo{Dst: *ipNet, Gw: gwIP}
 	routes = append(routes, route)
-	if err := addRoutes(nl, netioshim, interfaceName, routes); err != nil {
+	if err := addRoutes(nl, netioshim, interfaceName, routes, false); err != nil {
 		if err != nil && !strings.Contains(strings.ToLower(err.Error()), "file exists") {
 			log.Printf("addroutes failed with error %v", err)
 			return err

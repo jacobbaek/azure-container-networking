@@ -152,7 +152,7 @@ func (client *TransparentEndpointClient) AddEndpointRules(epInfo *EndpointInfo) 
 		log.Printf("[net] Adding route for the ip %v", ipNet.String())
 		routeInfo.Dst = ipNet
 		routeInfoList = append(routeInfoList, routeInfo)
-		if err := addRoutes(client.netlink, client.netioshim, client.hostVethName, routeInfoList); err != nil {
+		if err := addRoutes(client.netlink, client.netioshim, client.hostVethName, routeInfoList, false); err != nil {
 			return newErrorTransparentEndpointClient(err.Error())
 		}
 	}
@@ -234,7 +234,7 @@ func (client *TransparentEndpointClient) ConfigureContainerInterfacesAndRoutes(e
 		Dst:   *virtualGwNet,
 		Scope: netlink.RT_SCOPE_LINK,
 	}
-	if err := addRoutes(client.netlink, client.netioshim, client.containerVethName, []RouteInfo{routeInfo}); err != nil {
+	if err := addRoutes(client.netlink, client.netioshim, client.containerVethName, []RouteInfo{routeInfo}, false); err != nil {
 		return newErrorTransparentEndpointClient(err.Error())
 	}
 
@@ -245,7 +245,7 @@ func (client *TransparentEndpointClient) ConfigureContainerInterfacesAndRoutes(e
 		Dst: dstIP,
 		Gw:  virtualGwIP,
 	}
-	if err := addRoutes(client.netlink, client.netioshim, client.containerVethName, []RouteInfo{routeInfo}); err != nil {
+	if err := addRoutes(client.netlink, client.netioshim, client.containerVethName, []RouteInfo{routeInfo}, false); err != nil {
 		return err
 	}
 
@@ -294,7 +294,7 @@ func (client *TransparentEndpointClient) setupIPV6Routes() error {
 		Gw:  virtualGwIP,
 	}
 
-	return addRoutes(client.netlink, client.netioshim, client.containerVethName, []RouteInfo{gwRoute, defaultRoute})
+	return addRoutes(client.netlink, client.netioshim, client.containerVethName, []RouteInfo{gwRoute, defaultRoute}, false)
 }
 
 func (client *TransparentEndpointClient) setIPV6NeighEntry() error {
