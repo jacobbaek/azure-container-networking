@@ -262,19 +262,26 @@ func TestUpdatePodCacheCleanupOrder(t *testing.T) {
 
 	upc.order = append(upc.order, pod1.PodKey, pod2.PodKey, pod3.PodKey)
 
-	require.Equal(t, 3, len(upc.order))
-
 	upc.cleanupOrder()
-	require.Equal(t, 3, len(upc.order))
-
-	delete(upc.cache, pod2.PodKey)
-	upc.cleanupOrder()
-	require.Equal(t, 2, len(upc.order))
+	require.Equal(t, upc.order, []string{pod1.PodKey, pod2.PodKey, pod3.PodKey})
 
 	delete(upc.cache, pod1.PodKey)
+	upc.cleanupOrder()
+	require.Equal(t, upc.order, []string{pod2.PodKey, pod3.PodKey})
+
+	upc.order = append(upc.order, pod1.PodKey)
+	upc.cache[pod1.PodKey] = pod1
+	upc.cleanupOrder()
+	require.Equal(t, upc.order, []string{pod2.PodKey, pod3.PodKey, pod1.PodKey})
+
+	delete(upc.cache, pod2.PodKey)
 	delete(upc.cache, pod3.PodKey)
 	upc.cleanupOrder()
-	require.Equal(t, 0, len(upc.order))
+	require.Equal(t, upc.order, []string{pod1.PodKey})
+
+	delete(upc.cache, pod1.PodKey)
+	upc.cleanupOrder()
+	require.Equal(t, upc.order, []string{})
 }
 
 func getBootupTestCalls() []testutils.TestCmd {
