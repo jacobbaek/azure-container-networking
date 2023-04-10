@@ -191,7 +191,14 @@ func (client *TransparentVlanEndpointClient) PopulateVM(epInfo *EndpointInfo) er
 	}
 	client.vnetNSFileDescriptor = vnetNS
 
-	if err = client.netUtilsClient.CreateEndpoint(client.vnetVethName, client.containerVethName, nil); err != nil {
+	// Get the default constant host veth mac
+	mac, err := net.ParseMAC(defaultHostVethHwAddr)
+	if err != nil {
+		log.Printf("[net] Failed to parse the mac addrress %v", defaultHostVethHwAddr)
+	}
+
+	// Create veth pair
+	if err = client.netUtilsClient.CreateEndpoint(client.vnetVethName, client.containerVethName, mac); err != nil {
 		return errors.Wrap(err, "failed to create veth pair")
 	}
 	// Disable RA for veth pair, and delete if any failure
