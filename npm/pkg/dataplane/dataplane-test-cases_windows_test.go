@@ -1297,7 +1297,6 @@ func updatePodTests() []*SerialTestCase {
 			},
 			TestCaseMetadata: &TestCaseMetadata{
 				Tags: []Tag{
-
 					podCrudTag,
 					netpolCrudTag,
 				},
@@ -1358,7 +1357,6 @@ func updatePodTests() []*SerialTestCase {
 			},
 			TestCaseMetadata: &TestCaseMetadata{
 				Tags: []Tag{
-
 					podCrudTag,
 					netpolCrudTag,
 				},
