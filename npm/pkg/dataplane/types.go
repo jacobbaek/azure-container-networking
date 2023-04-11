@@ -2,10 +2,12 @@ package dataplane
 
 import (
 	"strings"
+	"sync"
 
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/ipsets"
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/policies"
 	"github.com/Azure/azure-container-networking/npm/util"
+	"k8s.io/klog"
 )
 
 type GenericDataplane interface {
@@ -75,4 +77,71 @@ func (npmPod *updateNPMPod) updateIPSetsToRemove(setNames []*ipsets.IPSetMetadat
 	for _, set := range setNames {
 		npmPod.IPSetsToRemove = append(npmPod.IPSetsToRemove, set.GetPrefixName())
 	}
+}
+
+type updatePodCache struct {
+	sync.Mutex
+	cache map[string]*updateNPMPod
+	// queue maintains the FIFO queue of the pods in the cache.
+	// This makes sure we handle issue 1729 with the same queue as the control plane.
+	// It also lets us update Pod ACLs in the same queue as the control plane so that
+	// e.g. the first Pod created is the first Pod to have proper connectivity.
+	queue           []string
+	initialCapacity int
+}
+
+// newUpdatePodCache creates a new updatePodCache with the given initial capacity for the queue
+func newUpdatePodCache(initialCapacity int) *updatePodCache {
+	return &updatePodCache{
+		cache:           make(map[string]*updateNPMPod),
+		queue:           make([]string, 0, initialCapacity),
+		initialCapacity: initialCapacity,
+	}
+}
+
+// enqueue adds a pod to the queue if necessary and returns the pod object used
+func (c *updatePodCache) enqueue(m *PodMetadata) *updateNPMPod {
+	pod, ok := c.cache[m.PodKey]
+	if !ok {
+		klog.Infof("[DataPlane] pod key %s not found in updatePodCache. creating a new obj", m.PodKey)
+
+		pod = newUpdateNPMPod(m)
+		c.cache[m.PodKey] = pod
+		c.queue = append(c.queue, m.PodKey)
+	}
+
+	return pod
+}
+
+// dequeue returns the first pod in the queue and removes it from the queue.
+// Caller should ensure the queue is not empty.
+// Otherwise, the following will occur: "panic: runtime error: index out of range [0] with length 0"
+func (c *updatePodCache) dequeue() *updateNPMPod {
+	pod := c.cache[c.queue[0]]
+	c.queue = c.queue[1:]
+	delete(c.cache, pod.PodKey)
+
+	if c.isEmpty() {
+		// reset the slice to make sure the underlying array is garbage collected (not sure if this is necessary)
+		c.queue = make([]string, 0, c.initialCapacity)
+	}
+
+	return pod
+}
+
+// requeue adds the pod to the end of the queue
+func (c *updatePodCache) requeue(pod *updateNPMPod) {
+	if _, ok := c.cache[pod.PodKey]; ok {
+		// should not happen
+		klog.Infof("[DataPlane] pod key %s already exists in updatePodCache. skipping requeue", pod.PodKey)
+		return
+	}
+
+	c.cache[pod.PodKey] = pod
+	c.queue = append(c.queue, pod.PodKey)
+}
+
+// isEmpty returns true if the queue is empty
+func (c *updatePodCache) isEmpty() bool {
+	return len(c.queue) == 0
 }

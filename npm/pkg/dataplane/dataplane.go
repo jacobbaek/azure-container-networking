@@ -24,40 +24,6 @@ type Config struct {
 	*policies.PolicyManagerCfg
 }
 
-type updatePodCache struct {
-	sync.Mutex
-	cache map[string]*updateNPMPod
-	// queue maintains the FIFO queue of the pods in the cache.
-	// This makes sure we handle sequence 2 of issue 1729 with the same queue as the control plane.
-	// It also lets us update Pod ACLs in the same queue as the control plane so that
-	// e.g. the first Pod created is the first Pod to have proper connectivity.
-	queue []string
-}
-
-func newUpdatePodCache() *updatePodCache {
-	return &updatePodCache{
-		cache: make(map[string]*updateNPMPod),
-		queue: make([]string, 0),
-	}
-}
-
-// removeDeletedItemsFromQueue removes all elements in the queue slice which aren't in the cache.
-// removeDeletedItemsFromQueue should be called while holding the updatePodCache lock.
-func (u *updatePodCache) removeDeletedItemsFromQueue() {
-	if len(u.cache) == 0 {
-		u.queue = make([]string, 0)
-		return
-	}
-
-	newQueue := make([]string, 0)
-	for _, podKey := range u.queue {
-		if _, ok := u.cache[podKey]; ok {
-			newQueue = append(newQueue, podKey)
-		}
-	}
-	u.queue = newQueue
-}
-
 type endpointCache struct {
 	sync.Mutex
 	cache map[string]*npmEndpoint
@@ -95,7 +61,7 @@ func NewDataPlane(nodeName string, ioShim *common.IOShim, cfg *Config, stopChann
 		endpointCache:  newEndpointCache(),
 		nodeName:       nodeName,
 		ioShim:         ioShim,
-		updatePodCache: newUpdatePodCache(),
+		updatePodCache: newUpdatePodCache(1),
 		endpointQuery:  new(endpointQuery),
 		stopChannel:    stopChannel,
 	}
@@ -169,16 +135,7 @@ func (dp *DataPlane) AddToSets(setNames []*ipsets.IPSetMetadata, podMetadata *Po
 		dp.updatePodCache.Lock()
 		defer dp.updatePodCache.Unlock()
 
-		updatePod, ok := dp.updatePodCache.cache[podMetadata.PodKey]
-		if !ok {
-			klog.Infof("[DataPlane] {AddToSet} pod key %s not found in updatePodCache. creating a new obj", podMetadata.PodKey)
-			updatePod = newUpdateNPMPod(podMetadata)
-			dp.updatePodCache.cache[podMetadata.PodKey] = updatePod
-
-			// add to queue only if not in the cache/queue already
-			dp.updatePodCache.queue = append(dp.updatePodCache.queue, podMetadata.PodKey)
-		}
-
+		updatePod := dp.updatePodCache.enqueue(podMetadata)
 		updatePod.updateIPSetsToAdd(setNames)
 	}
 
@@ -200,16 +157,7 @@ func (dp *DataPlane) RemoveFromSets(setNames []*ipsets.IPSetMetadata, podMetadat
 		dp.updatePodCache.Lock()
 		defer dp.updatePodCache.Unlock()
 
-		updatePod, ok := dp.updatePodCache.cache[podMetadata.PodKey]
-		if !ok {
-			klog.Infof("[DataPlane] {RemoveFromSet} pod key %s not found in updatePodCache. creating a new obj", podMetadata.PodKey)
-			updatePod = newUpdateNPMPod(podMetadata)
-			dp.updatePodCache.cache[podMetadata.PodKey] = updatePod
-
-			// add to queue only if not in the cache/queue already
-			dp.updatePodCache.queue = append(dp.updatePodCache.queue, podMetadata.PodKey)
-		}
-
+		updatePod := dp.updatePodCache.enqueue(podMetadata)
 		updatePod.updateIPSetsToRemove(setNames)
 	}
 
@@ -251,8 +199,7 @@ func (dp *DataPlane) ApplyDataPlane() error {
 	if dp.shouldUpdatePod() {
 		// do not refresh endpoints if the updatePodCache is empty
 		dp.updatePodCache.Lock()
-		if len(dp.updatePodCache.cache) == 0 {
-			dp.updatePodCache.removeDeletedItemsFromQueue()
+		if dp.updatePodCache.isEmpty() {
 			dp.updatePodCache.Unlock()
 			return nil
 		}
@@ -268,26 +215,16 @@ func (dp *DataPlane) ApplyDataPlane() error {
 		// lock updatePodCache while driving goal state to kernel
 		// prevents another ApplyDataplane call from updating the same pods
 		dp.updatePodCache.Lock()
-		defer func() {
-			dp.updatePodCache.removeDeletedItemsFromQueue()
-			dp.updatePodCache.Unlock()
-		}()
+		defer dp.updatePodCache.Unlock()
 
-		for _, podKey := range dp.updatePodCache.queue {
-			pod, ok := dp.updatePodCache.cache[podKey]
-			if !ok {
-				metrics.SendErrorLogAndMetric(util.DaemonDataplaneID, "[DataPlane] skipping update since pod not found in updatePodCache. podKey: %s", podKey)
-				continue
-			}
-
-			err := dp.updatePod(pod)
-			if err != nil {
+		for !dp.updatePodCache.isEmpty() {
+			pod := dp.updatePodCache.dequeue()
+			if err := dp.updatePod(pod); err != nil {
 				// move on to the next and later return as success since this can be retried irrespective of other operations
-				metrics.SendErrorLogAndMetric(util.DaemonDataplaneID, "failed to update pod while applying the dataplane. key: [%s], err: [%s]", podKey, err.Error())
+				metrics.SendErrorLogAndMetric(util.DaemonDataplaneID, "failed to update pod while applying the dataplane. key: [%s], err: [%s]", pod.PodKey, err.Error())
+				dp.updatePodCache.requeue(pod)
 				continue
 			}
-
-			delete(dp.updatePodCache.cache, podKey)
 		}
 	}
 	return nil

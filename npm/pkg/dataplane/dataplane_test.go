@@ -249,39 +249,111 @@ func TestUpdatePolicy(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestUpdatePodCacheCleanupOrder(t *testing.T) {
-	upc := newUpdatePodCache()
+func TestUpdatePodCache(t *testing.T) {
+	m1 := NewPodMetadata("x/a", "10.0.0.1", nodeName)
+	m2 := NewPodMetadata("x/b", "10.0.0.2", nodeName)
+	m3 := NewPodMetadata("x/c", "10.0.0.3", nodeName)
 
-	pod1 := newUpdateNPMPod(NewPodMetadata("x/a", "10.0.0.1", nodeName))
-	pod2 := newUpdateNPMPod(NewPodMetadata("x/b", "10.0.0.2", nodeName))
-	pod3 := newUpdateNPMPod(NewPodMetadata("x/c", "10.0.0.3", nodeName))
+	c := newUpdatePodCache(3)
+	require.True(t, c.isEmpty())
 
-	upc.cache[pod1.PodKey] = pod1
-	upc.cache[pod2.PodKey] = pod2
-	upc.cache[pod3.PodKey] = pod3
+	p1 := c.enqueue(m1)
+	require.False(t, c.isEmpty())
+	require.Equal(t, *newUpdateNPMPod(m1), *p1)
+	require.Equal(t, c.queue, []string{m1.PodKey})
+	require.Equal(t, c.cache, map[string]*updateNPMPod{m1.PodKey: p1})
 
-	upc.queue = append(upc.queue, pod1.PodKey, pod2.PodKey, pod3.PodKey)
+	p2 := c.enqueue(m2)
+	require.False(t, c.isEmpty())
+	require.Equal(t, *newUpdateNPMPod(m2), *p2)
+	require.Equal(t, c.queue, []string{m1.PodKey, m2.PodKey})
+	require.Equal(t, c.cache, map[string]*updateNPMPod{m1.PodKey: p1, m2.PodKey: p2})
 
-	upc.removeDeletedItemsFromQueue()
-	require.Equal(t, upc.queue, []string{pod1.PodKey, pod2.PodKey, pod3.PodKey})
+	p3 := c.enqueue(m3)
+	require.False(t, c.isEmpty())
+	require.Equal(t, *newUpdateNPMPod(m3), *p3)
+	require.Equal(t, c.queue, []string{m1.PodKey, m2.PodKey, m3.PodKey})
+	require.Equal(t, c.cache, map[string]*updateNPMPod{m1.PodKey: p1, m2.PodKey: p2, m3.PodKey: p3})
 
-	delete(upc.cache, pod1.PodKey)
-	upc.removeDeletedItemsFromQueue()
-	require.Equal(t, upc.queue, []string{pod2.PodKey, pod3.PodKey})
+	// Test that enqueueing an existing pod does not change the queue or cache.
+	pairs := []struct {
+		m *PodMetadata
+		p *updateNPMPod
+	}{
+		{m1, p1},
+		{m2, p2},
+		{m3, p3},
+	}
+	for _, pair := range pairs {
+		p := c.enqueue(pair.m)
+		require.False(t, c.isEmpty())
+		require.Equal(t, pair.p, p)
+		require.Equal(t, c.queue, []string{m1.PodKey, m2.PodKey, m3.PodKey})
+		require.Equal(t, c.cache, map[string]*updateNPMPod{m1.PodKey: p1, m2.PodKey: p2, m3.PodKey: p3})
+	}
 
-	upc.queue = append(upc.queue, pod1.PodKey)
-	upc.cache[pod1.PodKey] = pod1
-	upc.removeDeletedItemsFromQueue()
-	require.Equal(t, upc.queue, []string{pod2.PodKey, pod3.PodKey, pod1.PodKey})
+	// test dequeue
+	p := c.dequeue()
+	require.False(t, c.isEmpty())
+	require.Equal(t, p1, p)
+	require.Equal(t, c.queue, []string{m2.PodKey, m3.PodKey})
+	require.Equal(t, c.cache, map[string]*updateNPMPod{m2.PodKey: p2, m3.PodKey: p3})
 
-	delete(upc.cache, pod2.PodKey)
-	delete(upc.cache, pod3.PodKey)
-	upc.removeDeletedItemsFromQueue()
-	require.Equal(t, upc.queue, []string{pod1.PodKey})
+	p = c.dequeue()
+	require.False(t, c.isEmpty())
+	require.Equal(t, p2, p)
+	require.Equal(t, c.queue, []string{m3.PodKey})
+	require.Equal(t, c.cache, map[string]*updateNPMPod{m3.PodKey: p3})
 
-	delete(upc.cache, pod1.PodKey)
-	upc.removeDeletedItemsFromQueue()
-	require.Equal(t, upc.queue, []string{})
+	// test requeuing
+	c.requeue(p)
+	require.False(t, c.isEmpty())
+	require.Equal(t, c.queue, []string{m3.PodKey, m2.PodKey})
+	require.Equal(t, c.cache, map[string]*updateNPMPod{m3.PodKey: p3, m2.PodKey: p2})
+
+	p = c.dequeue()
+	require.False(t, c.isEmpty())
+	require.Equal(t, p3, p)
+	require.Equal(t, c.queue, []string{m2.PodKey})
+	require.Equal(t, c.cache, map[string]*updateNPMPod{m2.PodKey: p2})
+
+	// test enqueuing again
+	p = c.enqueue(m1)
+	require.Equal(t, *p1, *p)
+	require.False(t, c.isEmpty())
+	require.Equal(t, c.queue, []string{m2.PodKey, m1.PodKey})
+	require.Equal(t, c.cache, map[string]*updateNPMPod{m2.PodKey: p2, m1.PodKey: p1})
+
+	p = c.dequeue()
+	require.False(t, c.isEmpty())
+	require.Equal(t, p2, p)
+	require.Equal(t, c.queue, []string{m1.PodKey})
+	require.Equal(t, c.cache, map[string]*updateNPMPod{m1.PodKey: p1})
+
+	p = c.dequeue()
+	require.True(t, c.isEmpty())
+	require.Equal(t, p1, p)
+	require.Equal(t, c.queue, []string{})
+	require.Equal(t, c.cache, map[string]*updateNPMPod{})
+
+	// test requeue on empty queue
+	c.requeue(p)
+	require.False(t, c.isEmpty())
+	require.Equal(t, c.queue, []string{m1.PodKey})
+	require.Equal(t, c.cache, map[string]*updateNPMPod{m1.PodKey: p1})
+
+	p = c.dequeue()
+	require.True(t, c.isEmpty())
+	require.Equal(t, p1, p)
+	require.Equal(t, c.queue, []string{})
+	require.Equal(t, c.cache, map[string]*updateNPMPod{})
+
+	// test enqueue on empty queue
+	p = c.enqueue(m3)
+	require.False(t, c.isEmpty())
+	require.Equal(t, *p3, *p)
+	require.Equal(t, c.queue, []string{m3.PodKey})
+	require.Equal(t, c.cache, map[string]*updateNPMPod{m3.PodKey: p})
 }
 
 func getBootupTestCalls() []testutils.TestCmd {
