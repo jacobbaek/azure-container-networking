@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/version"
 )
 
@@ -444,4 +445,10 @@ func TestSliceToString(t *testing.T) {
 	if got := SliceToString(list); want != got {
 		t.Errorf("SliceToString() got = %v, want %v, using delimiter %v", got, want, SetPolicyDelimiter)
 	}
+}
+
+func TestNodeIP(t *testing.T) {
+	ip, err := NodeIP()
+	require.Nil(t, err, "NodeIP() returned error")
+	require.NotEmpty(t, ip, "Node IP should be non-empty")
 }
