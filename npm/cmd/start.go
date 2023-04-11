@@ -137,15 +137,19 @@ func start(config npmconfig.Config, flags npmconfig.Flags) error {
 		}
 
 		var nodeIP string
-		nodeIP, err = util.NodeIP()
-		if err != nil {
-			return fmt.Errorf("failed to get node IP while booting up: %w", err)
+		if util.IsWindowsDP() {
+			nodeIP, err = util.NodeIP()
+			if err != nil {
+				metrics.SendErrorLogAndMetric(util.NpmID, "error: failed to get node IP while booting up: %v", err)
+				return fmt.Errorf("failed to get node IP while booting up: %w", err)
+			}
+			klog.Infof("node IP is %s", nodeIP)
 		}
-
 		npmV2DataplaneCfg.NodeIP = nodeIP
 
 		dp, err = dataplane.NewDataPlane(models.GetNodeName(), common.NewIOShim(), npmV2DataplaneCfg, stopChannel)
 		if err != nil {
+			metrics.SendErrorLogAndMetric(util.NpmID, "error: failed to create dataplane with error %v", err)
 			return fmt.Errorf("failed to create dataplane with error %w", err)
 		}
 		dp.RunPeriodicTasks()
