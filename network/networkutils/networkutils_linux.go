@@ -267,6 +267,12 @@ func (nu NetworkUtils) DisableRAForInterface(ifName string) error {
 	return err
 }
 
+func (nu NetworkUtils) SetProxyArp(ifName string) error {
+	cmd := fmt.Sprintf("echo 1 > /proc/sys/net/ipv4/conf/%v/proxy_arp", ifName)
+	_, err := nu.plClient.ExecuteCommand(cmd)
+	return err
+}
+
 func getPrivateIPSpace() []string {
 	privateIPAddresses := []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16"}
 	return privateIPAddresses
