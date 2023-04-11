@@ -3,6 +3,7 @@
 package util
 
 import (
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"net"
@@ -28,6 +29,8 @@ const (
 	ForceDelete DeleteOption = true
 	SoftDelete  DeleteOption = false
 )
+
+var ErrEmptyNodeIP = errors.New("error: node IP is empty")
 
 // regex to get minor version
 var re = regexp.MustCompile("[0-9]+")
@@ -349,5 +352,10 @@ func NodeIP() (string, error) {
 	defer conn.Close()
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
-	return localAddr.IP.String(), nil
+	nodeIP := localAddr.IP.String()
+	if nodeIP == "" {
+		return "", ErrEmptyNodeIP
+	}
+
+	return nodeIP, nil
 }

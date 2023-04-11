@@ -448,7 +448,6 @@ func TestSliceToString(t *testing.T) {
 }
 
 func TestNodeIP(t *testing.T) {
-	ip, err := NodeIP()
+	_, err := NodeIP()
 	require.Nil(t, err, "NodeIP() returned error")
-	require.NotEmpty(t, ip, "Node IP should be non-empty")
 }
